@@ -2,6 +2,7 @@ extends Node3D
 
 @export var world_size: Vector3 =  Vector3(16,16,16)
 @export var colors : Array[Color]
+@export var voxelScale: float = 1.0
 @export_range(-1,1) var cutoff: float = 0.5
 
 # Called when the node enters the scene tree for the first time.
@@ -21,9 +22,11 @@ func _ready() -> void:
 	var startTime = Time.get_ticks_usec()
 	 
 	#var random_gen = RandomNumberGenerator.new()
-	for x in range(world_size.x):
-		for z in range(world_size.z):
-			for y in range(2, 2 + world_size.y):
+	for x in range(world_size.x / voxelScale):
+		for z in range(world_size.z / voxelScale):
+			#Adjust y range for bottom leveled
+			#Top leveled selection 
+			for y in range(0, world_size.y):
 				var random_num = random_gen.get_noise_3d(x,y,z) 
 				if random_num > cutoff:
 					data[Vector3(x,y,z)] = colors[y % colors.size()]
@@ -32,9 +35,9 @@ func _ready() -> void:
 	#Calc generation statistics
 	var endTime = Time.get_ticks_usec()
 	var genTime = (endTime - startTime) / 100000
-	print_debug("Blocks generated %s\n Gen Time: %s seconds" % [cubes,genTime])
+	print_debug("World Map generated %s\nGen Time: %s seconds" % [cubes,genTime])
 	
-	mesh_instance.genMesh(data)
+	mesh_instance.genMesh(data, voxelScale)
 	#default_camera.position = Vector3(world_size.x/2,world_size.y* 0.75,world_size.z)
 	#default_camera.rotation = Vector3(-45,-25,0)
 	

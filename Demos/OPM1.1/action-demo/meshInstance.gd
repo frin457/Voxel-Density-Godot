@@ -42,21 +42,20 @@ var cColors: Dictionary[Face,Color] = {
 func _ready() -> void: 
 	surfaceArray.resize(Mesh.ARRAY_MAX)
 
-# 2. UPDATE: Added dynamic voxel_size argument (matches the previous script update)
 func genMesh(data : Dictionary[Vector3,Color], voxel_size: float = 1.0) -> void:
 	# Half-dimension calculation for building the cube centered around its origin
-	var cDim = voxel_size * 0.5
+	var voxelDimensions = voxel_size * 0.5
 	
 	# Generate the local cube vertices dynamically based on the requested size
 	var dynamic_vertices: Array[Vector3] = [
-		Vector3(-cDim, -cDim, cDim ),
-		Vector3(cDim , -cDim, cDim ),
-		Vector3(cDim , -cDim, -cDim),
-		Vector3(-cDim, -cDim, -cDim),
-		Vector3(-cDim, cDim , cDim ),
-		Vector3(cDim , cDim , cDim ),
-		Vector3(cDim , cDim , -cDim),
-		Vector3(-cDim, cDim , -cDim)
+		Vector3(-voxelDimensions, -voxelDimensions, voxelDimensions ),
+		Vector3(voxelDimensions , -voxelDimensions, voxelDimensions ),
+		Vector3(voxelDimensions , -voxelDimensions, -voxelDimensions),
+		Vector3(-voxelDimensions, -voxelDimensions, -voxelDimensions),
+		Vector3(-voxelDimensions, voxelDimensions , voxelDimensions ),
+		Vector3(voxelDimensions , voxelDimensions , voxelDimensions ),
+		Vector3(voxelDimensions , voxelDimensions , -voxelDimensions),
+		Vector3(-voxelDimensions, voxelDimensions , -voxelDimensions)
 	]
 
 	for position in data:
