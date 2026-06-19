@@ -2,48 +2,35 @@
 
 [ext_resource type="Script" uid="uid://b0xpsn7va3w78" path="res://world.gd" id="1_fj7yv"]
 [ext_resource type="PackedScene" uid="uid://co68l2ekwhii8" path="res://player.tscn" id="2_fj7yv"]
+[ext_resource type="Script" uid="uid://dnne8b4ma507m" path="res://meshInstance.gd" id="3_tlwt5"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_aqk2v"]
-albedo_color = Color(0.90588236, 0.1254902, 0.24313726, 0.64705884)
+[sub_resource type="ArrayMesh" id="ArrayMesh_tlwt5"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tlwt5"]
+shading_mode = 0
 vertex_color_use_as_albedo = true
-
-[sub_resource type="BoxMesh" id="BoxMesh_aqk2v"]
-
-[sub_resource type="MultiMesh" id="MultiMesh_036b0"]
-transform_format = 1
-use_colors = true
-mesh = SubResource("BoxMesh_aqk2v")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fj7yv"]
-albedo_color = Color(0.562773, 0.9948253, 0.61646914, 1)
 
 [node name="World" type="Node3D" unique_id=182766135]
 script = ExtResource("1_fj7yv")
-world_size = Vector3(128, 32, 128)
+world_size = Vector3(80, 32, 124)
 colors = Array[Color]([Color(0.61993515, 0.18052539, 0.49019623, 1), Color(0, 0.49803922, 0, 1), Color(0.28669193, 0.50101376, 1, 1), Color(0.82467663, 0.82115227, 0.32658967, 1)])
 cutoff = 0.3999999999999999
-
-[node name="DefaultCube" type="CSGBox3D" parent="." unique_id=1868451376]
-use_collision = true
-material = SubResource("StandardMaterial3D_aqk2v")
 
 [node name="DefaultCamera" type="Camera3D" parent="." unique_id=347226805]
 transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 1, 0, 0, 10)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1058569397]
-transform = Transform3D(0.9396926, 0.05939117, -0.33682406, 0, 0.9848077, 0.17364818, 0.34202012, -0.16317591, 0.9254165, 24, 24, 24)
+transform = Transform3D(0.94572943, -0.047975298, 0.32139376, 0.1631759, 0.92541647, -0.3420201, -0.2810146, 0.37590224, 0.8830221, 0, 0, 0)
 
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("2_fj7yv")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 20, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4)
 up_direction = Vector3(0, 0, 1)
 
-[node name="MultiMeshInstance3D" type="MultiMeshInstance3D" parent="." unique_id=872015320]
-material_override = SubResource("StandardMaterial3D_tlwt5")
-multimesh = SubResource("MultiMesh_036b0")
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=964551621]
+mesh = SubResource("ArrayMesh_tlwt5")
+script = ExtResource("3_tlwt5")
+mat = SubResource("StandardMaterial3D_tlwt5")
 
-[node name="Ground" type="CSGBox3D" parent="." unique_id=799163134]
-transform = Transform3D(100, 0, 0, 0, 1, 0, 0, 0, 100, 0, 0, 0)
-use_collision = true
-material = SubResource("StandardMaterial3D_fj7yv")
+[node name="StaticBody3D" type="StaticBody3D" parent="MeshInstance3D" unique_id=527960562]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshInstance3D/StaticBody3D" unique_id=1578105781]
