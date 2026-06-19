@@ -6,10 +6,21 @@
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_aqk2v"]
 albedo_color = Color(0.90588236, 0.1254902, 0.24313726, 0.64705884)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tlwt5"]
+albedo_color = Color(0.40103936, 0.7728201, 0.9154483, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_aqk2v"]
+
+[sub_resource type="MultiMesh" id="MultiMesh_036b0"]
+transform_format = 1
+use_colors = true
+mesh = SubResource("BoxMesh_aqk2v")
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fj7yv"]
 albedo_color = Color(0.562773, 0.9948253, 0.61646914, 1)
 
 [node name="World" type="Node3D" unique_id=182766135]
+visible = false
 script = ExtResource("1_fj7yv")
 world_size = Vector3(64, 64, 64)
 
@@ -26,6 +37,10 @@ transform = Transform3D(0.9396926, 0.05939117, -0.33682406, 0, 0.9848077, 0.1736
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("2_fj7yv")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 20, 0)
 up_direction = Vector3(0, 0, 1)
+
+[node name="MultiMeshInstance3D" type="MultiMeshInstance3D" parent="." unique_id=872015320]
+material_override = SubResource("StandardMaterial3D_tlwt5")
+multimesh = SubResource("MultiMesh_036b0")
 
 [node name="Ground" type="CSGBox3D" parent="." unique_id=799163134]
 transform = Transform3D(100, 0, 0, 0, 1, 0, 0, 0, 100, 0, 0, 0)
