@@ -21,8 +21,9 @@ albedo_color = Color(0.562773, 0.9948253, 0.61646914, 1)
 
 [node name="World" type="Node3D" unique_id=182766135]
 script = ExtResource("1_fj7yv")
-world_size = Vector3(64, 64, 64)
+world_size = Vector3(128, 32, 128)
 colors = Array[Color]([Color(0.61993515, 0.18052539, 0.49019623, 1), Color(0, 0.49803922, 0, 1), Color(0.28669193, 0.50101376, 1, 1), Color(0.82467663, 0.82115227, 0.32658967, 1)])
+cutoff = 0.3999999999999999
 
 [node name="DefaultCube" type="CSGBox3D" parent="." unique_id=1868451376]
 use_collision = true
