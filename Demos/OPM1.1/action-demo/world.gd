@@ -8,11 +8,13 @@ extends Node3D
 @onready var default_camera: Camera3D = $DefaultCamera
 
 func _ready() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	
 	var random_gen = FastNoiseLite.new()
 	#var random_gen = RandomNumberGenerator.new()
 	for x in range(world_size.x):
 		for z in range(world_size.z):
-			for y in range(world_size.y):
+			for y in range(2, 2 + world_size.y):
 				var random_num = random_gen.get_noise_3d(x,y,z)
 				#var random_num = random_gen.randf()
 				if random_num > cutoff:
@@ -24,3 +26,7 @@ func _ready() -> void:
 	default_camera.rotation = Vector3(-45,-25,0)
 	
 	remove_child(default_cube) #Remove default cube
+	
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		get_tree().quit()
