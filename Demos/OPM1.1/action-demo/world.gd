@@ -1,14 +1,22 @@
 extends Node3D
 
 @export var world_size: Vector3 =  Vector3(16,16,16)
-@export var colors : Array[Color]
+@export var colors : Array[Color] = [
+	Color.GRAY,
+	Color.NAVY_BLUE,
+	Color.INDIAN_RED,
+	Color.BURLYWOOD,
+	Color.YELLOW,
+	Color.GREEN_YELLOW
+]
 @export var voxelScale: float = 1.0
 @export_range(-1,1) var cutoff: float = 0.5
 
 # Called when the node enters the scene tree for the first time.
-#@onready var default_cube : CSGBox3D = $DefaultCube
-@onready var mesh_instance: MeshInstance3D = $MeshInstance3D
+#@onready var default_cube : CSGBox3D = $DefaultCubes
 @onready var default_camera: Camera3D = $DefaultCamera
+@onready var chunk : Chunk = $Chunk
+
 
 #Custom data
 var cubes: int = 0
@@ -34,10 +42,10 @@ func _ready() -> void:
 					
 	#Calc generation statistics
 	var endTime = Time.get_ticks_usec()
-	var genTime = (endTime - startTime) / 100000
-	print_debug("World Map generated %s\nGen Time: %s seconds" % [cubes,genTime])
+	var genTime = (endTime - startTime) 
+	print_debug("Cubes mapped: %s\nGen Time: %s milliseconds" % [cubes,genTime])
 	
-	mesh_instance.genMesh(data, voxelScale)
+	chunk.genMesh(data, voxelScale)
 	#default_camera.position = Vector3(world_size.x/2,world_size.y* 0.75,world_size.z)
 	#default_camera.rotation = Vector3(-45,-25,0)
 	

@@ -46,7 +46,6 @@ var cColors: Dictionary[Face,Color] = {
 	Face.RIGHT  : Color.BURLYWOOD,
 	Face.BOTTOM : Color.YELLOW,
 	Face.TOP    : Color.GREEN_YELLOW
-	
 }
 
 func _ready() -> void: 
