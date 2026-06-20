@@ -36,18 +36,20 @@ var cColors: Dictionary[Face,Color] = {
 	Face.LEFT   : Color.INDIAN_RED,
 	Face.RIGHT  : Color.BURLYWOOD,
 	Face.BOTTOM : Color.YELLOW,
-	Face.TOP    : Color.GREEN_YELLOW
+	Face.TOP    : Color(171,0,102,255)
 }
 
 func _ready() -> void: 
 	surfaceArray.resize(Mesh.ARRAY_MAX)
 	meshInstance.mesh = ArrayMesh.new()
+	if voxels.is_empty(): return
+	commitMesh()
 
 func genData(chunkSize: int, maxHeight:int, noise: Noise, colorArr: Array[Color]) -> void:
 	for x in range(chunkSize):
 		for z in range(chunkSize):
+			#TODO: Provide an algo as an input
 			var globalPos = Vector2(x + position.x, z + position.z)
-			
 			var rand = ((noise.get_noise_2d(globalPos.x,globalPos.y) + 0.5 * noise.get_noise_2d(globalPos.x * 2, globalPos.y * 2) + 0.25 * noise.get_noise_2d(4 * globalPos.x,4 * globalPos.y)
 			) / 1.75 + 1
 			) / 2
@@ -95,8 +97,6 @@ func genMesh(voxel_size: float = 1.0) -> void:
 			addFace(Face.BOTTOM, world_position, cColors[Face.BOTTOM], dynamic_vertices)
 		if not hasNeighbour(voxels, Face.TOP, position):
 			addFace(Face.TOP, world_position, cColors[Face.TOP], dynamic_vertices)
-	
-	commitMesh()
 	
 func hasNeighbour(data: Dictionary[Vector3,Color], face:Face, position:Vector3) -> bool:
 	var adjacent = position + cNormals[face]
