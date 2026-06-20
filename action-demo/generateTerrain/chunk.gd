@@ -1,11 +1,10 @@
 class_name Chunk extends StaticBody3D
 
 @export var mat : Material
-
 @onready var collisionShape: CollisionShape3D = $CollisionShape3D
 @onready var meshInstance : MeshInstance3D = $MeshInstance3D
 
-var voxels: Dictionary[Vector3, Color] ={}
+var voxels: Dictionary[Vector3, Color] = {}
 var surfaceArray : Array = []
 var vertices = PackedVector3Array()
 var normals = PackedVector3Array()
@@ -42,11 +41,14 @@ var cColors: Dictionary[Face,Color] = {
 
 func _ready() -> void: 
 	surfaceArray.resize(Mesh.ARRAY_MAX)
+	meshInstance.mesh = ArrayMesh.new()
 
-func generateData(chunkSize: int, maxHeight:int, noise: Noise, colorArr: Array[Color]) -> void:
+func genData(chunkSize: int, maxHeight:int, noise: Noise, colorArr: Array[Color]) -> void:
 	for x in range(chunkSize):
 		for z in range(chunkSize):
-			var rand = ((noise.get_noise_2d(x,z) + 0.5 * noise.get_noise_2d(x * 2, z * 2) + 0.25 * noise.get_noise_2d(4 * x,4 * z)
+			var globalPos = Vector2(x + position.x, z + position.z)
+			
+			var rand = ((noise.get_noise_2d(globalPos.x,globalPos.y) + 0.5 * noise.get_noise_2d(globalPos.x * 2, globalPos.y * 2) + 0.25 * noise.get_noise_2d(4 * globalPos.x,4 * globalPos.y)
 			) / 1.75 + 1
 			) / 2
 			var randP = pow(rand,2.1)
@@ -60,6 +62,7 @@ func generateData(chunkSize: int, maxHeight:int, noise: Noise, colorArr: Array[C
 			
 			
 func genMesh(voxel_size: float = 1.0) -> void:
+	if voxels.is_empty(): return
 	var voxelDimensions = voxel_size * 0.5
 	
 	# Generate the local cube vertices dynamically based on the requested size
@@ -73,10 +76,11 @@ func genMesh(voxel_size: float = 1.0) -> void:
 		Vector3(voxelDimensions , voxelDimensions , -voxelDimensions),
 		Vector3(-voxelDimensions, voxelDimensions , -voxelDimensions)
 	]
-
+	
 	for position in voxels:
 		# Scale the integer grid coordinates to actual 3D world space positions
 		var world_position = position * voxel_size
+		
 		
 		# Neighbor checks stay on integer coordinates (position)
 		if not hasNeighbour(voxels, Face.FRONT, position):
@@ -114,6 +118,7 @@ func commitMesh() -> void:
 	surfaceArray[Mesh.ARRAY_NORMAL] = normals
 	surfaceArray[Mesh.ARRAY_COLOR] = colors
 	
+	if surfaceArray.is_empty(): return
 	meshInstance.mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surfaceArray)
 	meshInstance.mesh.surface_set_material(0, mat)
 	collisionShape.shape = meshInstance.mesh.create_trimesh_shape()
