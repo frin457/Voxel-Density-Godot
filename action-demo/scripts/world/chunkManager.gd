@@ -1,8 +1,12 @@
-# ChunkManager.gd
 class_name ChunkManager
 extends Node
 
 @export var voxelScale: float = 1.0
+@export var chunkSize: int = 32
+@export var noiseSeed: int = 0
+@export var workerCount: int = 4
+
+@export var dimensions: Vector3 = Vector3(128, 64, 128)
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -13,32 +17,27 @@ extends Node
 	Color.GREEN_YELLOW
 ]
 
-@export var dimensions: Vector3 = Vector3(128, 64, 128)
-@export var chunkSize: int = 32
-@export var noiseSeed: int = 0
-@export var workerCount: int = 4
-
 var random := FastNoiseLite.new()
-var totalChunks: Vector3i
 
 var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
 
+# Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
 var collision_controller := CollisionController.new()
 
-var threads: Array[Thread] = []
+# JOB SYSTEM
+var job_queue := ChunkJobQueue.new()
 
-var generation_queue: Array[Dictionary] = []
-var completed_chunks: Array
-
+# world state
 var chunks: Dictionary = {}
 
+var totalChunks: Vector3i
+
 
 # ----------------------------
-# Lifecycle
+# READY
 # ----------------------------
-
 func _ready() -> void:
 
 	random.seed = noiseSeed
@@ -51,182 +50,126 @@ func _ready() -> void:
 		int(dimensions.z / chunkSize)
 	)
 
-	threads.clear()
-
-	for i in range(workerCount):
-		threads.append(Thread.new())
-
-	var regions = getThreadRegions(workerCount)
-
-	startGen(regions)
+	start_world_generation()
 
 
 # ----------------------------
-# Region Partitioning
+# WORLD BOOTSTRAP
 # ----------------------------
+func start_world_generation() -> void:
 
-func getThreadRegions(worker_count: int) -> Array:
-
-	var regions = []
-
-	var grid_x = int(ceil(sqrt(worker_count)))
-	var grid_z = int(ceil(worker_count / float(grid_x)))
-
-	var chunks_x_per_region = int(totalChunks.x / grid_x)
-	var chunks_z_per_region = int(totalChunks.z / grid_z)
-
-	var index = 0
-
-	for gz in range(grid_z):
-		for gx in range(grid_x):
-
-			if index >= worker_count:
-				break
-
-			var region = {
-				"x_min": gx * chunks_x_per_region,
-				"x_max": min((gx + 1) * chunks_x_per_region, totalChunks.x),
-				"z_min": gz * chunks_z_per_region,
-				"z_max": min((gz + 1) * chunks_z_per_region, totalChunks.z)
-			}
-
-			regions.append(region)
-			index += 1
-
-	return regions
-
-
-# ----------------------------
-# Thread Startup
-# ----------------------------
-
-func startGen(regions: Array) -> void:
-
-	for i in range(regions.size()):
-		threads[i].start(genRegion.bind(regions[i]))
-
-
-# ----------------------------
-# Thread Worker
-# ----------------------------
-
-func genRegion(region: Dictionary) -> void:
-
-	var local_results: Array = []
-
-	for x in range(region["x_min"], region["x_max"]):
-		for z in range(region["z_min"], region["z_max"]):
+	for x in range(totalChunks.x):
+		for z in range(totalChunks.z):
 			for y in range(totalChunks.y):
 
-				var chunk_coord = Vector3i(x, y, z)
-				var world_pos = Vector3(chunk_coord) * chunkSize
+				var coord = Vector3i(x, y, z)
 
-				var voxel_data = terrain_generator.generate_data(
-					world_pos,
-					chunkSize,
-					dimensions.y,
-					random,
-					colors
+				job_queue.push(
+					ChunkJob.new(
+						ChunkJob.JobType.GENERATE,
+						coord
+					)
 				)
 
-				local_results.append({
-					"coord": chunk_coord,
-					"position": world_pos,
-					"voxels": voxel_data
-				})
-
-	call_deferred("_receive_chunks", local_results)
-
 
 # ----------------------------
-# Thread -> Main Thread handoff
+# MAIN LOOP
 # ----------------------------
-
-func _receive_chunks(results: Array) -> void:
-
-	for r in results:
-		completed_chunks.append(r)
-
-
-# ----------------------------
-# Main Thread Processing
-# ----------------------------
-
 func _process(delta: float) -> void:
 
-	var chunks_per_frame = 2
+	# 1. move thread-safe jobs into main queue
+	job_queue.flush()
 
-	for i in range(chunks_per_frame):
+	var jobs_per_frame = 2
 
-		if completed_chunks.is_empty():
+	for i in range(jobs_per_frame):
+
+		var job = job_queue.pop()
+		if job == null:
 			return
 
-		var result = completed_chunks.pop_front()
-
-		createChunk(
-			result.coord,
-			result.position,
-			result.voxels
-		)
-
-	# optional: incremental mesh updates (future-safe)
-	_process_dirty_chunks()
+		execute(job)
 
 
 # ----------------------------
-# Chunk Creation
+# JOB EXECUTION DISPATCHER
 # ----------------------------
+func execute(job: ChunkJob) -> void:
 
-func createChunk(
-	chunk_coord: Vector3i,
-	world_position: Vector3,
-	voxel_data: Dictionary
-) -> void:
+	match job.type:
 
-	var new_chunk: Chunk = chunk_scene.instantiate()
+		ChunkJob.JobType.GENERATE:
+			handleGen(job)
 
-	new_chunk.position = world_position
-	new_chunk.voxel_size = voxelScale
+		ChunkJob.JobType.MESH:
+			handleMesh(job)
 
-	add_child(new_chunk)
-
-	chunks[chunk_coord] = new_chunk
-
-	new_chunk.set_voxel_data(voxel_data)
-
-	processChunk(new_chunk)
+		ChunkJob.JobType.COLLISION:
+			handleCollision(job)
 
 
 # ----------------------------
-# Chunk Processing Pipeline
+# GENERATE CHUNK
 # ----------------------------
+func handleGen(job: ChunkJob) -> void:
 
-func processChunk(chunk: Chunk) -> void:
+	var coord = job.chunk_coord
+	var world_pos = Vector3(coord) * chunkSize
+
+	var voxel_data = terrain_generator.generate_data(
+		world_pos,
+		chunkSize,
+		dimensions.y,
+		random,
+		colors
+	)
+
+	var chunk: Chunk = chunk_scene.instantiate()
+
+	chunk.position = world_pos
+	chunk.voxel_size = voxelScale
+
+	add_child(chunk)
+
+	chunks[coord] = chunk
+
+	chunk.set_voxel_data(voxel_data)
+
+	# enqueue next stages
+	job_queue.push(
+		ChunkJob.new(ChunkJob.JobType.MESH, coord)
+	)
+
+	job_queue.push(
+		ChunkJob.new(ChunkJob.JobType.COLLISION, coord)
+	)
+
+
+# ----------------------------
+# MESH JOB
+# ----------------------------
+func handleMesh(job: ChunkJob) -> void:
+
+	var chunk = chunks.get(job.chunk_coord)
+	if chunk == null:
+		return
 
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
-
-	if chunk.collision_dirty:
-		collision_controller.rebuild(chunk)
 
 	chunk.clear_dirty()
 
 
 # ----------------------------
-# Optional incremental pipeline hook
+# COLLISION JOB
 # ----------------------------
+func handleCollision(job: ChunkJob) -> void:
 
-func _process_dirty_chunks() -> void:
-	# Future: unify generation + destruction + LOD here
-	pass
+	var chunk = chunks.get(job.chunk_coord)
+	if chunk == null:
+		return
 
+	if chunk.collision_dirty:
+		collision_controller.rebuild(chunk)
 
-# ----------------------------
-# Cleanup
-# ----------------------------
-
-func _exit_tree() -> void:
-
-	for t in threads:
-		if t.is_started():
-			t.wait_to_finish()
+	chunk.clear_dirty()

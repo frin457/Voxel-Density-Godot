@@ -20,5 +20,5 @@ transform = Transform3D(-0.984598, 0, 0.17483398, 0, 1, 0, -0.17483398, 0, -0.98
 up_direction = Vector3(0, 0, 1)
 
 [node name="ChunkManager" parent="." unique_id=1047331650 instance=ExtResource("3_xnpnm")]
+dimensions = Vector3(512, 32, 512)
 colors = Array[Color]([Color(0.74509805, 0.74509805, 0.74509805, 1), Color(0.6901961, 0, 0.5019608, 1), Color(0.8039216, 0.36078432, 0.36078432, 1), Color(0.87058824, 0.72156864, 0.5294118, 1), Color(1, 0.28627452, 0, 1), Color(0.67058825, 0, 0.4, 1)])
-dimensions = Vector3(128, 32, 256)
