@@ -2,23 +2,35 @@ class_name ChunkJobQueue
 extends RefCounted
 
 var queue: Array[ChunkJob] = []
-
-# thread-safe buffer
 var pending_add: Array[ChunkJob] = []
 
 
+# ----------------------------
+# THREAD-SAFE PUSH
+# ----------------------------
 func push(job: ChunkJob) -> void:
-	# called from ANY thread-safe context (deferred safe)
 	pending_add.append(job)
 
 
+# ----------------------------
+# FLUSH THREAD BUFFER
+# ----------------------------
 func flush() -> void:
-	# move pending into main queue
+
 	for j in pending_add:
 		queue.append(j)
+
 	pending_add.clear()
 
+	# 🔥 sort by priority AFTER merge
+	queue.sort_custom(func(a, b):
+		return a.priority > b.priority
+	)
 
+
+# ----------------------------
+# POP HIGHEST PRIORITY
+# ----------------------------
 func pop() -> ChunkJob:
 	if queue.is_empty():
 		return null

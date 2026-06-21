@@ -1,4 +1,5 @@
-class_name ChunkJob extends RefCounted
+class_name ChunkJob
+extends RefCounted
 
 enum JobType {
 	GENERATE,
@@ -10,16 +11,32 @@ enum JobType {
 }
 
 var type: JobType
-var chunk_coord: Vector3i
+var chunkCoordinate: Vector3i
 
-# Optional payload depending on job type
 var data: Dictionary = {}
 
-# Priority system (future LOD support)
-var priority: int = 0
+# 🔥 NEW: world-space position (cached for priority)
+var worldPos: Vector3
 
-func _init(_type: JobType, _coord: Vector3i, _data: Dictionary = {}, _priority: int = 0):
+# 🔥 NEW: priority (higher = processed first)
+var priority: float = 0.0
+
+# 🔥 NEW: level of detail hint
+var lodLevel: int = 0
+
+
+func _init(
+	_type: JobType,
+	_coord: Vector3i,
+	_world_position: Vector3 = Vector3.ZERO,
+	_data: Dictionary = {},
+	_priority: float = 0.0,
+	_lod: int = 0
+):
+
 	type = _type
-	chunk_coord = _coord
+	chunkCoordinate = _coord
+	worldPos = _world_position
 	data = _data
 	priority = _priority
+	lodLevel = _lod
