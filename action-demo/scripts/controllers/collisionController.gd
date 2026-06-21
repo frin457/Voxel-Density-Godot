@@ -1,5 +1,4 @@
-class_name CollisionController
-extends RefCounted
+class_name CollisionController extends RefCounted
 
 
 func rebuild(chunk: Chunk):

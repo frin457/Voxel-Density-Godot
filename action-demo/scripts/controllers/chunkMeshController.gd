@@ -8,9 +8,7 @@
 # - Multithreaded mesh generation
 # - Material batching
 
-class_name ChunkMeshController
-extends RefCounted
-
+class_name ChunkMeshController extends RefCounted
 
 enum Face {
 	BOTTOM,
@@ -21,7 +19,6 @@ enum Face {
 	BACK
 }
 
-
 var cIndys = {
 	Face.FRONT : [[0,4,5],[0,5,1]],
 	Face.BACK  : [[2,7,3],[2,6,7]],
@@ -31,7 +28,6 @@ var cIndys = {
 	Face.TOP   : [[4,7,6],[4,6,5]]
 }
 
-
 var cNormals = {
 	Face.FRONT  : Vector3(0,0,1),
 	Face.BACK   : Vector3(0,0,-1),
@@ -40,7 +36,6 @@ var cNormals = {
 	Face.BOTTOM : Vector3(0,-1,0),
 	Face.TOP    : Vector3(0,1,0)
 }
-
 
 func rebuild(chunk: Chunk) -> void:
 
