@@ -1,5 +1,4 @@
-class_name Chunk
-extends StaticBody3D
+class_name Chunk extends StaticBody3D
 
 @export var mat: Material
 
@@ -14,19 +13,21 @@ var subdivision_level: int = 0
 var mesh_dirty := false
 var collision_dirty := false
 
+
 func _ready() -> void:
 	meshInstance.mesh = ArrayMesh.new()
 
-func mark_dirty():
+
+func mark_dirty() -> void:
 	mesh_dirty = true
 	collision_dirty = true
 
-func clear_dirty():
+
+func clear_dirty() -> void:
 	mesh_dirty = false
 	collision_dirty = false
 
 
-# NEW
-func set_voxel_data(data: Dictionary):
+func set_voxel_data(data: Dictionary) -> void:
 	voxels = data
 	mark_dirty()

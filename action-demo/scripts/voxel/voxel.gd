@@ -1,7 +1,6 @@
 # voxel.gd
 
-class_name Voxel
-extends RefCounted
+class_name Voxel extends RefCounted
 
 var color: Color
 var health: float = 100.0

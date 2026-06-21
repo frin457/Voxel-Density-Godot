@@ -1,5 +1,4 @@
-class_name ChunkJobQueue
-extends RefCounted
+class_name ChunkJobQueue extends RefCounted
 
 var queue: Array[ChunkJob] = []
 var pending_add: Array[ChunkJob] = []
@@ -15,18 +14,15 @@ func push(job: ChunkJob) -> void:
 # ----------------------------
 # FLUSH THREAD BUFFER
 # ----------------------------
-func flush() -> void:
-
+func flush():
 	for j in pending_add:
 		queue.append(j)
 
 	pending_add.clear()
 
-	# 🔥 sort by priority AFTER merge
 	queue.sort_custom(func(a, b):
 		return a.priority > b.priority
 	)
-
 
 # ----------------------------
 # POP HIGHEST PRIORITY

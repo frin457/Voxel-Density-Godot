@@ -6,9 +6,6 @@ class_name ChunkManager extends Node
 @export var workerCount: int = 4
 
 @export var dimensions: Vector3 = Vector3(128, 64, 128)
-@export var player: Node3D
-@export var generation_radius: float = 200.0
-@export var max_lod_distance: float = 400.0
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -27,11 +24,12 @@ var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
 var collision_controller := CollisionController.new()
+var query_controller: QueryController
 
-# JOB SYSTEM
+# Job system
 var job_queue := ChunkJobQueue.new()
 
-# world state
+# World state
 var chunks: Dictionary = {}
 
 var totalChunks: Vector3i
@@ -41,22 +39,57 @@ var totalChunks: Vector3i
 # READY
 # ----------------------------
 func _ready() -> void:
+	query_controller = QueryController.new(self)
 
 	random.seed = noiseSeed
 	random.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	random.frequency = 0.003
 
-	totalChunks = Vector3i(
-		int(dimensions.x / chunkSize),
-		int(dimensions.y / chunkSize),
-		int(dimensions.z / chunkSize)
-	)
+	_sanitize_world_settings()
 
 	start_world_generation()
 
 
 # ----------------------------
-# WORLD BOOTSTRAP
+# WORLD SANITY + SAFETY
+# ----------------------------
+func _sanitize_world_settings() -> void:
+	
+	# Prevent invalid inspector overrides
+	dimensions = Vector3(
+		max(1.0, dimensions.x),
+		max(1.0, dimensions.y),
+		max(1.0, dimensions.z)
+	)
+
+	chunkSize = max(1, chunkSize)
+
+	totalChunks = Vector3i(
+		max(1, int(dimensions.x / chunkSize)),
+		max(1, int(dimensions.y / chunkSize)),
+		max(1, int(dimensions.z / chunkSize))
+	)
+
+# ----------------------------
+# MAIN LOOP
+# ----------------------------
+func _process(delta: float) -> void:
+
+	job_queue.flush()
+
+	var jobs_per_frame := 2
+
+	for i in range(jobs_per_frame):
+
+		var job = job_queue.pop()
+		if job == null:
+			break
+
+		execute(job)
+
+
+# ----------------------------
+# WORLD GENERATION
 # ----------------------------
 func start_world_generation() -> void:
 
@@ -67,53 +100,17 @@ func start_world_generation() -> void:
 				var coord = Vector3i(x, y, z)
 				var world_pos = Vector3(coord) * chunkSize
 
-				var dist = 0.0
-				if player != null:
-					dist = player.global_position.distance_to(world_pos)
-
-				# 🔥 PRIORITY SYSTEM
-				var priority = 1.0 / max(dist, 1.0)
-
-				# 🔥 LOD SYSTEM (distance-based)
-				var lod = 0
-				if dist > max_lod_distance * 0.75:
-					lod = 2
-				elif dist > generation_radius:
-					lod = 1
-
 				job_queue.push(
 					ChunkJob.new(
 						ChunkJob.JobType.GENERATE,
 						coord,
-						world_pos,
-						{},
-						priority,
-						lod
+						world_pos
 					)
 				)
 
 
 # ----------------------------
-# MAIN LOOP
-# ----------------------------
-func _process(delta: float) -> void:
-
-	# 1. move thread-safe jobs into main queue
-	job_queue.flush()
-
-	var jobs_per_frame = 2
-
-	for i in range(jobs_per_frame):
-
-		var job = job_queue.pop()
-		if job == null:
-			return
-
-		execute(job)
-
-
-# ----------------------------
-# JOB EXECUTION DISPATCHER
+# DISPATCH
 # ----------------------------
 func execute(job: ChunkJob) -> void:
 
@@ -121,12 +118,6 @@ func execute(job: ChunkJob) -> void:
 
 		ChunkJob.JobType.GENERATE:
 			handle_generate(job)
-
-		ChunkJob.JobType.MESH:
-			handle_mesh(job)
-
-		ChunkJob.JobType.COLLISION:
-			handle_collision(job)
 
 
 # ----------------------------
@@ -137,26 +128,17 @@ func handle_generate(job: ChunkJob) -> void:
 	var coord = job.chunk_coordinate
 	var world_pos = job.world_position
 
-	var chunk_size_modifier = chunkSize
-
-	# 🔥 LOD REDUCTION (key voxel behavior)
-	if job.lod_level == 1:
-		chunk_size_modifier = chunkSize / 2
-	elif job.lod_level == 2:
-		chunk_size_modifier = chunkSize / 4
-
 	var voxel_data = terrain_generator.generate_data(
 		world_pos,
-		chunk_size_modifier,
+		chunkSize,
 		dimensions.y,
 		random,
 		colors
 	)
 
 	var chunk: Chunk = chunk_scene.instantiate()
-
 	chunk.position = world_pos
-	chunk.voxel_size = voxelScale * (job.lod_level + 1)
+	chunk.voxel_size = voxelScale
 
 	add_child(chunk)
 
@@ -164,53 +146,16 @@ func handle_generate(job: ChunkJob) -> void:
 
 	chunk.set_voxel_data(voxel_data)
 
-	# chain next jobs (still priority-aware)
-	job_queue.push(
-		ChunkJob.new(
-			ChunkJob.JobType.MESH,
-			coord,
-			world_pos,
-			{},
-			job.priority,
-			job.lod_level
-		)
-	)
-
-	job_queue.push(
-		ChunkJob.new(
-			ChunkJob.JobType.COLLISION,
-			coord,
-			world_pos,
-			{},
-			job.priority,
-			job.lod_level
-		)
-	)
+	process_chunk(chunk)
 
 
 # ----------------------------
-# MESH JOB
+# PROCESS CHUNK
 # ----------------------------
-func handle_mesh(job: ChunkJob) -> void:
-
-	var chunk = chunks.get(job.chunk_coordinate)
-	if chunk == null:
-		return
+func process_chunk(chunk: Chunk) -> void:
 
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
-
-	chunk.clear_dirty()
-
-
-# ----------------------------
-# COLLISION JOB
-# ----------------------------
-func handle_collision(job: ChunkJob) -> void:
-
-	var chunk = chunks.get(job.chunk_coordinate)
-	if chunk == null:
-		return
 
 	if chunk.collision_dirty:
 		collision_controller.rebuild(chunk)
