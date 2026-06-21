@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://co68l2ekwhii8"]
 
-[ext_resource type="Script" uid="uid://mwmky03uexkg" path="res://controller/player.gd" id="1_y7a6a"]
+[ext_resource type="Script" uid="uid://mwmky03uexkg" path="res://controller/unit/player.gd" id="1_y7a6a"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_onrkg"]
 
