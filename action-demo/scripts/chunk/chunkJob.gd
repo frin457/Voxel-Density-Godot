@@ -11,18 +11,18 @@ enum JobType {
 }
 
 var type: JobType
-var chunkCoordinate: Vector3i
+var chunk_coordinate: Vector3i
 
 var data: Dictionary = {}
 
 # 🔥 NEW: world-space position (cached for priority)
-var worldPos: Vector3
+var world_position: Vector3
 
 # 🔥 NEW: priority (higher = processed first)
 var priority: float = 0.0
 
 # 🔥 NEW: level of detail hint
-var lodLevel: int = 0
+var lod_level: int = 0
 
 
 func _init(
@@ -35,8 +35,8 @@ func _init(
 ):
 
 	type = _type
-	chunkCoordinate = _coord
-	worldPos = _world_position
+	chunk_coordinate = _coord
+	world_position = _world_position
 	data = _data
 	priority = _priority
-	lodLevel = _lod
+	lod_level = _lod

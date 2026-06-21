@@ -134,7 +134,7 @@ func execute(job: ChunkJob) -> void:
 # ----------------------------
 func handle_generate(job: ChunkJob) -> void:
 
-	var coord = job.chunk_coord
+	var coord = job.chunk_coordinate
 	var world_pos = job.world_position
 
 	var chunk_size_modifier = chunkSize
@@ -193,7 +193,7 @@ func handle_generate(job: ChunkJob) -> void:
 # ----------------------------
 func handle_mesh(job: ChunkJob) -> void:
 
-	var chunk = chunks.get(job.chunkCoordinate)
+	var chunk = chunks.get(job.chunk_coordinate)
 	if chunk == null:
 		return
 
@@ -208,7 +208,7 @@ func handle_mesh(job: ChunkJob) -> void:
 # ----------------------------
 func handle_collision(job: ChunkJob) -> void:
 
-	var chunk = chunks.get(job.chunkCoordinate)
+	var chunk = chunks.get(job.chunk_coordinate)
 	if chunk == null:
 		return
 
