@@ -17,7 +17,7 @@ class_name ChunkManager extends Node
 ]
 
 var random := FastNoiseLite.new()
-
+#var subdivision_controller := SubdivisionController.new(self)
 var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
 
 # Controllers
@@ -49,6 +49,9 @@ func _ready() -> void:
 
 	start_world_generation()
 
+	# TEMP TEST ONLY
+	#await get_tree().create_timer(2.0).timeout
+	#subdivision_controller.debug_force_subdivide_center()
 
 # ----------------------------
 # WORLD SANITY + SAFETY
@@ -147,7 +150,8 @@ func handle_generate(job: ChunkJob) -> void:
 	chunk.set_voxel_data(voxel_data)
 
 	process_chunk(chunk)
-
+	#subDivision test statement
+	#print("GENERATING CHUNK:", job.chunk_coordinate, "LOD:", job.lod_level)
 
 # ----------------------------
 # PROCESS CHUNK
