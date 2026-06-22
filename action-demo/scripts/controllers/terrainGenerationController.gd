@@ -15,7 +15,7 @@ func generate_data(
 
 	var voxels := {}
 
-	# We loop exactly from 0 to chunk_resolution - 1 to match your grid perfectly
+	# We loop exactly from 0 to chunk_resolution - 1 to align with the grid 
 	for x in range(chunk_resolution):
 		for z in range(chunk_resolution):
 

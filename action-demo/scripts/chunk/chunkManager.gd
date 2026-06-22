@@ -1,13 +1,22 @@
 #./scripts/chunk/chunkManager.gd
 class_name ChunkManager extends Node
 
+# Global Configuration Parameters (The Rules of the Universe)
 @export var voxel_scale: float = 1.0
 @export var chunk_size: int = 32
 @export var noiseSeed: int = 0
 @export var workerCount: int = 4
-
 @export var dimensions: Vector3 = Vector3(128, 64, 128)
-@export var chunk_material: Material # Added to pass down to chunks cleanly
+@export var chunk_material: Material
+
+# Global Controllers initializes at start up
+var terrain_generator := TerrainGenerationController.new()
+var mesh_controller := ChunkMeshController.new()
+var collision_controller := CollisionController.new()
+
+# Core controllers initialized in _ready()
+var subdivision_controller: SubdivisionController
+var query_controller: QueryController
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -18,16 +27,6 @@ class_name ChunkManager extends Node
 	Color.GREEN_YELLOW
 ]
 
-var random := FastNoiseLite.new()
-var subdivision_controller: SubdivisionController
-var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
-
-# Controllers
-var terrain_generator := TerrainGenerationController.new()
-var mesh_controller := ChunkMeshController.new()
-var collision_controller := CollisionController.new()
-var query_controller: QueryController
-
 # Job system
 var job_queue := ChunkJobQueue.new()
 
@@ -35,27 +34,54 @@ var job_queue := ChunkJobQueue.new()
 var chunks: Dictionary = {}
 var total_chunks: Vector3i
 
+
 # Helper to build an octree safe identifier key
 func get_chunk_key(coord: Vector3i, lod: int) -> String:
 	return "%d_%d_%d_LOD%d" % [coord.x, coord.y, coord.z, lod]
+
+func get_chunk_world_size() -> float:
+	return float(chunk_size) * voxel_scale
+
+# Clean, decoupled entry points for ANY external script
+signal subdivision_requested(coord: Vector3i, target_level: int)
+signal generation_requested()
+
+var random := FastNoiseLite.new()
+var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
+
 
 # ----------------------------
 # READY
 # ----------------------------
 func _ready() -> void:
+	# Explicitly assign controllers first
 	query_controller = QueryController.new(self)
 	subdivision_controller = SubdivisionController.new(self)
+	
+	subdivision_requested.connect(subdivision_controller.request_subdivision)
+	generation_requested.connect(start_world_generation)
 
-	random.seed = noiseSeed
-	random.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	random.frequency = 0.003
 
-	_sanitize_world_settings()
-	start_world_generation()
+func _on_subdivision_requested(coord: Vector3i, lod_level: int) -> void:
+	subdivision_controller.request_subdivision(coord, lod_level)
 
-	# --- Subdivision test ---
-	#await get_tree().create_timer(2.0).timeout
-	#subdivision_controller.debug_force_subdivide_center()
+
+## Hook: Subdivides all chunks touching a global physical 3D radius
+func _on_structural_impact_area_requested(world_position: Vector3, radius: float) -> void:
+	var world_size = get_chunk_world_size()
+	
+	# Compute a bounding box in chunk-space coordinates
+	var min_chunk_x = int(floor((world_position.x - radius) / world_size))
+	var max_chunk_x = int(floor((world_position.x + radius) / world_size))
+	var min_chunk_z = int(floor((world_position.z - radius) / world_size))
+	var max_chunk_z = int(floor((world_position.z + radius) / world_size))
+	
+	# Force subdivision across the entire hit envelope
+	for x in range(min_chunk_x, max_chunk_x + 1):
+		for z in range(min_chunk_z, max_chunk_z + 1):
+			# Target chunk origin column at base level (LOD 0)
+			var target_coord = Vector3i(x, 0, z) 
+			subdivision_controller.request_subdivision(target_coord, 1)
 
 
 # ----------------------------
@@ -104,6 +130,7 @@ func execute(job: ChunkJob) -> void:
 # WORLD GENERATION
 # ----------------------------
 func start_world_generation() -> void:
+	print("CRITICAL CHECK: start_world_generation() was actually triggered!")
 	for x in range(total_chunks.x):
 		for z in range(total_chunks.z):
 			for y in range(total_chunks.y):
@@ -131,7 +158,7 @@ func handle_generate(job: ChunkJob) -> void:
 	var coord = job.chunk_coordinate
 	var key = get_chunk_key(coord, job.lod_level)
 	
-	# CRITICAL SAFETY GUARD: If this exact chunk already exists or is actively rendering, 
+	# CRITICAL GUARD: If this exact chunk already exists or is actively rendering, 
 	# completely discard this job to prevent infinite duplication/flickering.
 	if chunks.has(key) and is_instance_valid(chunks[key]):
 		return
@@ -156,11 +183,9 @@ func handle_generate(job: ChunkJob) -> void:
 	chunk.mat = chunk_material
 
 	add_child(chunk)
-	chunks[key] = chunk # Save to our compound key dictionary
+	chunks[key] = chunk # Save compound key dictionary
 	
 	chunk.set_voxel_data(voxel_data)
-
-	_create_chunk_wireframe_bounds(chunk)
 	process_chunk(chunk)
 
 	_link_subdivision_hierarchy(coord, chunk)
@@ -179,7 +204,7 @@ func _link_subdivision_hierarchy(child_coord: Vector3i, child_chunk: Chunk) -> v
 		child_coord.z >> 1
 	)
 	
-	# Fetching using the correct parenting LOD step down
+	# Fetch with parenting LOD step down
 	var parent_key = get_chunk_key(parent_coord, child_chunk.subdivision_level - 1)
 	if chunks.has(parent_key):
 		var parent_chunk: Chunk = chunks[parent_key]
@@ -203,10 +228,9 @@ func process_chunk(chunk: Chunk) -> void:
 	chunk.clear_dirty()
 
 
-func get_chunk_world_size() -> float:
-	return chunk_size * voxel_scale    
-	
-
+# ----------------------------
+# CHUNK WIREFRAMES=DEBUG-ONLY
+# ----------------------------
 func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
 	# Keep wireframe box sized around the actual scaled bounds
 	var world_size = chunk_size * chunk.voxel_size
