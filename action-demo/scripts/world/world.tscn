@@ -6,7 +6,6 @@
 
 [node name="World" type="Node3D" unique_id=182766135]
 script = ExtResource("1_882fi")
-cutoff = -0.002
 
 [node name="DefaultCamera" type="Camera3D" parent="." unique_id=347226805]
 transform = Transform3D(-0.9984901, 0, -0.05493274, 0, 1, 0, 0.05493274, 0, -0.9984901, 2.3841858e-07, 4.232087, -4.326235)
@@ -16,9 +15,10 @@ fov = 56.250004
 transform = Transform3D(0.19809014, -0.29259142, 0.9354949, 0.24563725, -0.9091339, -0.3363602, 0.94890606, 0.29642206, -0.10821915, 0, 12.778907, 1.6133575)
 
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("2_3h5nr")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 21.405, 64, 40)
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 5, 10, 5)
 up_direction = Vector3(0, 0, 1)
 
 [node name="ChunkManager" parent="." unique_id=1047331650 instance=ExtResource("3_xnpnm")]
-dimensions = Vector3(256, 64, 256)
+chunk_size = 8
+dimensions = Vector3(64, 4, 64)
 colors = Array[Color]([Color(0.74509805, 0.74509805, 0.74509805, 1), Color(0.6901961, 0, 0.5019608, 1), Color(0.8039216, 0.36078432, 0.36078432, 1), Color(0.87058824, 0.72156864, 0.5294118, 1), Color(1, 0.28627452, 0, 1), Color(0.67058825, 0, 0.4, 1)])

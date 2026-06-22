@@ -25,9 +25,13 @@ func subdivide_chunk(chunk_coord: Vector3i, target_level: int) -> void:
 		return
 
 	var base_world_pos = chunk.position
-	var base_size = manager.chunkSize / pow(2, chunk.subdivision_level + 1)
+	var parent_world_size = (
+		manager.get_chunk_world_size()
+		/ pow(2, chunk.subdivision_level)
+	)
 
-	# Mark parent as inactive (we do NOT delete yet)
+	var child_world_size = parent_world_size * 0.5
+		# Mark parent as inactive (we do NOT delete yet)
 	chunk.set_process(false)
 
 	# 2x2x2 subdivision = 8 children
@@ -42,9 +46,9 @@ func subdivide_chunk(chunk_coord: Vector3i, target_level: int) -> void:
 				)
 
 				var child_world_pos = base_world_pos + Vector3(
-					x * base_size,
-					y * base_size,
-					z * base_size
+					x * child_world_size,
+					y * child_world_size,
+					z * child_world_size
 				)
 
 				manager.job_queue.push(

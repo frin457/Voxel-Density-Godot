@@ -1,53 +1,60 @@
 #./scripts/controllers/terrainGenerationController.gd
-class_name TerrainGenerationController
-extends RefCounted
+class_name TerrainGenerationController extends RefCounted
 
+@export var terrainExponent = 1.5
 
 func generate_data(
 	chunk_position: Vector3,
-	chunk_size: int,
-	max_height: int,
+	chunk_resolution: int,
+	voxel_size: float,
+	max_world_height: float,
 	noise: Noise,
 	color_array: Array[Color]
 ) -> Dictionary:
 
-	var voxels = {}
+	var voxels := {}
 
-	for x in range(chunk_size):
+	# Physical dimensions occupied by this chunk.
+	var chunk_world_size = chunk_resolution * voxel_size
 
-		for z in range(chunk_size):
+	for x in range(chunk_resolution):
 
-			var global_pos = Vector2(
-				x + chunk_position.x,
-				z + chunk_position.z
-			)
+		for z in range(chunk_resolution):
+
+			# Sample noise using WORLD coordinates.
+			var world_x = chunk_position.x + (x * voxel_size)
+			var world_z = chunk_position.z + (z * voxel_size)
 
 			var noise_value = (
-				noise.get_noise_2d(global_pos.x, global_pos.y)
+				noise.get_noise_2d(world_x, world_z)
 				+ 0.5 * noise.get_noise_2d(
-					global_pos.x * 2,
-					global_pos.y * 2
+					world_x * 2.0,
+					world_z * 2.0
 				)
 				+ 0.25 * noise.get_noise_2d(
-					global_pos.x * 4,
-					global_pos.y * 4
+					world_x * 4.0,
+					world_z * 4.0
 				)
 			)
 
 			noise_value /= 1.75
 
-			var normalized = (noise_value + 1.0) / 2.0
+			var normalized = (noise_value + 1.0) / 2
+			var adjusted = pow(normalized, terrainExponent)
 
-			var adjusted = pow(normalized, 2.1)
+			# Height now exists in WORLD SPACE.
+			var terrain_height = max_world_height * adjusted
 
-			var height = max_height * adjusted
+			for y in range(chunk_resolution):
 
-			if height < chunk_position.y:
-				continue
+				var world_y = (
+					chunk_position.y
+					+ (y * voxel_size)
+				)
 
-			var local_height = height - chunk_position.y
-
-			for y in range(min(local_height, chunk_size)):
+				# We've reached terrain surface.
+				if world_y > terrain_height:
+					break
 
 				voxels[
 					Vector3i(x, y, z)

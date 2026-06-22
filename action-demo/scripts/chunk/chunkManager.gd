@@ -1,8 +1,8 @@
 #./scripts/chunk/chunkManager.gd
 class_name ChunkManager extends Node
 
-@export var voxelScale: float = 1.0
-@export var chunkSize: int = 32
+@export var voxel_scale: float = 1.0
+@export var chunk_size: int = 32
 @export var noiseSeed: int = 0
 @export var workerCount: int = 4
 
@@ -33,7 +33,7 @@ var job_queue := ChunkJobQueue.new()
 # World state
 var chunks: Dictionary = {}
 
-var totalChunks: Vector3i
+var total_chunks: Vector3i
 
 
 # ----------------------------
@@ -66,13 +66,14 @@ func _sanitize_world_settings() -> void:
 		max(1.0, dimensions.z)
 	)
 
-	chunkSize = max(1, chunkSize)
-
-	totalChunks = Vector3i(
-		max(1, int(dimensions.x / chunkSize)),
-		max(1, int(dimensions.y / chunkSize)),
-		max(1, int(dimensions.z / chunkSize))
+	chunk_size = max(1, chunk_size)
+	var chunk_world_size := get_chunk_world_size()
+	total_chunks = Vector3i(
+		max(1, ceili(dimensions.x / chunk_world_size)),
+		max(1, ceili(dimensions.y / chunk_world_size)),
+		max(1, ceili(dimensions.z / chunk_world_size))
 	)
+
 
 # ----------------------------
 # MAIN LOOP
@@ -91,28 +92,6 @@ func _process(delta: float) -> void:
 
 		execute(job)
 
-
-# ----------------------------
-# WORLD GENERATION
-# ----------------------------
-func start_world_generation() -> void:
-
-	for x in range(totalChunks.x):
-		for z in range(totalChunks.z):
-			for y in range(totalChunks.y):
-
-				var coord = Vector3i(x, y, z)
-				var world_pos = Vector3(coord) * chunkSize
-
-				job_queue.push(
-					ChunkJob.new(
-						ChunkJob.JobType.GENERATE,
-						coord,
-						world_pos
-					)
-				)
-
-
 # ----------------------------
 # DISPATCH
 # ----------------------------
@@ -122,6 +101,27 @@ func execute(job: ChunkJob) -> void:
 
 		ChunkJob.JobType.GENERATE:
 			handle_generate(job)
+			
+# ----------------------------
+# WORLD GENERATION
+# ----------------------------
+func start_world_generation() -> void:
+
+	for x in range(total_chunks.x):
+		for z in range(total_chunks.z):
+			for y in range(total_chunks.y):
+
+				var coord = Vector3i(x, y, z)
+				var chunk_world_size = get_chunk_world_size()
+				var world_pos = Vector3(coord) * chunk_world_size
+				
+				job_queue.push(
+					ChunkJob.new(
+						ChunkJob.JobType.GENERATE,
+						coord,
+						world_pos
+					)
+				)
 
 
 # ----------------------------
@@ -133,16 +133,19 @@ func handle_generate(job: ChunkJob) -> void:
 
 	var voxel_data = terrain_generator.generate_data(
 		world_pos,
-		chunkSize,
+		chunk_size,
+		voxel_scale,
 		dimensions.y,
 		random,
 		colors
 	)
+	
+
 
 	var chunk: Chunk = chunk_scene.instantiate()
 	chunk.position = world_pos
-	chunk.voxel_size = voxelScale
-	chunk.subdivision_level = job.lod_level # <-- PropDrill `lod_level` to future steps
+	chunk.voxel_size = voxel_scale
+	chunk.subdivision_level = job.lod_level # <-- PropDrill `lod_level` into chunk params
 
 	add_child(chunk)
 	chunks[coord] = chunk
@@ -167,13 +170,22 @@ func process_chunk(chunk: Chunk) -> void:
 
 	chunk.clear_dirty()
 
+
+func get_chunk_world_size() -> float:
+	return chunk_size * voxel_scale	
 	
 func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
 	# Calculate size scaled down by the subdivision level
-	# Level 0 = chunkSize. Level 1 = chunkSize / 2. Level 2 = chunkSize / 4.
-	var dynamic_chunk_size = float(chunkSize) / pow(2, chunk.subdivision_level)
-	var max_p = Vector3.ONE * dynamic_chunk_size * chunk.voxel_size
-	var min_p = Vector3.ZERO
+	# Level 0 = chunk_size. Level 1 = chunk_size / 2. Level 2 = chunk_size / 4.
+	var world_size = (
+		chunk_size
+		* chunk.voxel_size
+	) / pow(2, chunk.subdivision_level)
+
+	var half_voxel = chunk.voxel_size * 0.5
+
+	var min_p = Vector3.ONE * -half_voxel
+	var max_p = Vector3.ONE * (world_size - half_voxel)
 
 	# Create a temporary immediate mesh surface for lines
 	var line_vertices := PackedVector3Array()
