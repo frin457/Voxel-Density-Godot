@@ -1,3 +1,4 @@
+#./scripts/controllers/subDivisionController.gd
 class_name SubdivisionController extends RefCounted
 
 # Reference back to world state (read-only access)

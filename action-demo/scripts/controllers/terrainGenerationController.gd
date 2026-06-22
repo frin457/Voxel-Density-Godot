@@ -1,3 +1,4 @@
+#./scripts/controllers/terrainGenerationController.gd
 class_name TerrainGenerationController
 extends RefCounted
 

@@ -1,4 +1,4 @@
-# ChunkMeshController.gd
+# ./scripts/controllers/ChunkMeshController.gd
 #
 # Responsible only for converting voxel data into renderable geometry.
 #
