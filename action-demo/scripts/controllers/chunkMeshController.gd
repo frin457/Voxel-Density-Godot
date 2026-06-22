@@ -19,7 +19,7 @@ enum Face {
 	BACK
 }
 
-var cIndys = {
+var cube_indicies = {
 	Face.FRONT : [[0,4,5],[0,5,1]],
 	Face.BACK  : [[2,7,3],[2,6,7]],
 	Face.LEFT  : [[3,7,4],[3,4,0]],
@@ -28,7 +28,7 @@ var cIndys = {
 	Face.TOP   : [[4,7,6],[4,6,5]]
 }
 
-var cNormals = {
+var cube_normals = {
 	Face.FRONT  : Vector3(0,0,1),
 	Face.BACK   : Vector3(0,0,-1),
 	Face.LEFT   : Vector3(-1,0,0),
@@ -162,7 +162,7 @@ func has_neighbor(
 	position: Vector3i
 ) -> bool:
 
-	var adjacent = position + Vector3i(cNormals[face])
+	var adjacent = position + Vector3i(cube_normals[face])
 
 	return chunk.voxels.has(adjacent)
 
@@ -177,7 +177,7 @@ func add_face(
 	custom_vertices: Array
 ) -> void:
 
-	for triangle in cIndys[face]:
+	for triangle in cube_indicies[face]:
 
 		for index in triangle:
 
@@ -186,7 +186,7 @@ func add_face(
 			)
 
 			normals.append(
-				cNormals[face]
+				cube_normals[face]
 			)
 
 			colors.append(
