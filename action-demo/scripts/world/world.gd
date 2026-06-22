@@ -1,6 +1,5 @@
 extends Node3D
 
-@export_range(-1,1) var cutoff: float = 0.5
 @onready var default_camera: Camera3D = $DefaultCamera
 
 var data: Dictionary[Vector3, Color] = {}
