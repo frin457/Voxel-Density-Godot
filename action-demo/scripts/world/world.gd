@@ -1,7 +1,7 @@
 #./scripts/world.gd
 extends Node3D
 
-@export var is_dev: bool = true
+@export var isDev: bool = true
 
 @onready var chunk_manager: ChunkManager
 @onready var default_camera: Camera3D = $DefaultCamera
@@ -16,17 +16,17 @@ func _ready() -> void:
 	if not chunk_manager:
 		chunk_manager = $ChunkManager as ChunkManager
 
-	# Guard clause: stop here if setup is missing
+	# guard clause: stop here if setup is missing
 	if not chunk_manager:
 		push_error("World: ChunkManager node reference missing!")
 		return
-		
-	# Boot world generation
-	chunk_manager.generation_requested.emit.call_deferred()
 	
-	# dev-mode testing sequence
-	if is_dev:
+	# runs first to begin listening to the generation signals
+	if isDev:
 		_run_development_test()
+		
+	# start world generation
+	chunk_manager.generation_requested.emit.call_deferred()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
@@ -36,11 +36,15 @@ func _unhandled_input(event: InputEvent) -> void:
 # COMPONENT EVENT TESTING
 # ----------------------------
 func _run_development_test() -> void:
-	print("World Trigger: Starting 2.0 second subdivision test delay...")
-	await get_tree().create_timer(2.0).timeout
+	if isDev:
+		print("World Trigger: Dev mode active. Awaiting deterministic 'generation_completed' signal...")
 	
+	# await the specific signal completion
+	await chunk_manager.generation_completed
+	
+	if isDev: 
+		print("World Trigger: Generation confirmed completed! Emitting request to subdivide center chunk.")
+		
 	var center_coord := Vector3i(0, 0, 0)
 	var target_lod_level := 1
-	
-	print("World Trigger: Emitting request to subdivide center chunk.")
 	chunk_manager.subdivision_requested.emit(center_coord, target_lod_level)

@@ -5,7 +5,8 @@ enum JobType {
 	GENERATE,
 	DESTRUCT,
 	SUBDIVIDE,
-	MERGE
+	MERGE,
+	MESH
 }
 
 var type: JobType
