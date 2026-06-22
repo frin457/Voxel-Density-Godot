@@ -36,11 +36,16 @@ var mesh_dirty := false
 var collision_dirty := false
 
 
-func _ready() -> void:
-	# Avoid overwriting an already generated/assigned mesh
-	if meshInstance and meshInstance.mesh == null:
-		meshInstance.mesh = ArrayMesh.new()
+#func _ready() -> void:
+	## Avoid overwriting an already generated/assigned mesh
+	#if meshInstance and meshInstance.mesh == null:
+		#meshInstance.mesh = ArrayMesh.new()
 
+func _ready() -> void:
+	# CRITICAL FIX: Explicitly assign a unique ArrayMesh instance 
+	# to break the shared template resource link across instances!
+	if meshInstance:
+		meshInstance.mesh = ArrayMesh.new()
 
 func mark_dirty() -> void:
 	mesh_dirty = true
