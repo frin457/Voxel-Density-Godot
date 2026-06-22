@@ -57,7 +57,7 @@ func rebuild(chunk: Chunk) -> void:
 		Vector3(-half_size,  half_size,  half_size),
 		Vector3( half_size,  half_size,  half_size),
 		Vector3( half_size,  half_size, -half_size),
-		Vector3(-half_size,  half_size, -half_size)
+			Vector3(-half_size,  half_size, -half_size)
 	]
 
 	for voxel_position in chunk.voxels.keys():
