@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://b4s5tiunt7gfn" path="res://scripts/world/world.gd" id="1_882fi"]
 [ext_resource type="PackedScene" uid="uid://co68l2ekwhii8" path="res://controller/unit/player.tscn" id="2_3h5nr"]
-[ext_resource type="PackedScene" uid="uid://bxab84iv8jm5v" path="res://scripts/chunk/chunkManager.tscn" id="3_xnpnm"]
+[ext_resource type="Script" uid="uid://cchlfslsnl51m" path="res://scripts/chunk/chunkManager.gd" id="3_882fi"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_882fi"]
 shading_mode = 0
@@ -22,8 +22,9 @@ transform = Transform3D(0.19809014, -0.29259142, 0.9354949, 0.24563725, -0.90913
 transform = Transform3D(-1, 0, 8.742277e-08, 0, 0.99999994, 0, -8.742278e-08, 0, -0.99999994, 5, 10, -10)
 up_direction = Vector3(0, 0, 1)
 
-[node name="ChunkManager" parent="." unique_id=1047331650 instance=ExtResource("3_xnpnm")]
-chunk_size = 8
-dimensions = Vector3(64, 8, 64)
+[node name="ChunkManager" type="Node" parent="." unique_id=772524256]
+script = ExtResource("3_882fi")
+isDev = true
+chunk_size = 20
+dimensions = Vector3(128, 16, 128)
 chunk_material = SubResource("StandardMaterial3D_882fi")
-colors = Array[Color]([Color(0.74509805, 0.74509805, 0.74509805, 1), Color(0.6901961, 0, 0.5019608, 1), Color(0.8039216, 0.36078432, 0.36078432, 1), Color(0.87058824, 0.72156864, 0.5294118, 1), Color(1, 0.28627452, 0, 1), Color(0.67058825, 0, 0.4, 1)])
