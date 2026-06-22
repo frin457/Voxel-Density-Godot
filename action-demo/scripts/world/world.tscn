@@ -26,5 +26,5 @@ up_direction = Vector3(0, 0, 1)
 script = ExtResource("3_882fi")
 isDev = true
 chunk_size = 20
-dimensions = Vector3(128, 16, 128)
+dimensions = Vector3(256, 16, 256)
 chunk_material = SubResource("StandardMaterial3D_882fi")

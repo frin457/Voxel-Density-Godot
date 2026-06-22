@@ -1,7 +1,7 @@
 #./scripts/chunk/chunkManager.gd
 class_name ChunkManager extends Node
 
-# Global Parameters
+# Global Parameters 
 @export var isDev: bool = false
 @export var voxel_scale: float = 1.0
 @export var chunk_size: int = 32
@@ -10,7 +10,7 @@ class_name ChunkManager extends Node
 @export var dimensions: Vector3 = Vector3(128, 64, 128)
 @export var chunk_material: Material
 
-# Global Controllers 
+# Global Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
 var collision_controller := CollisionController.new()
@@ -39,7 +39,10 @@ var total_chunks: Vector3i
 var initial_generation_cooked: bool = false
 var tracking_initial_gen: bool = false
 
-# Clean, decoupled entry points for ANY external script
+# Active asynchronous thread tracking array
+var active_thread_tasks: Array[int] = []
+
+# Decoupled entry points for ANY external script
 signal subdivision_requested(coord: Vector3i, target_level: int)
 signal generation_requested()
 signal generation_completed()
@@ -55,7 +58,7 @@ func get_chunk_world_size() -> float:
 	return float(chunk_size) * voxel_scale
 
 # ----------------------------
-# READY
+# READY & LIFECYCLE
 # ----------------------------
 func _ready() -> void:
 	# Explicitly assign controllers first
@@ -67,12 +70,21 @@ func _ready() -> void:
 	generation_requested.connect(start_world_generation)
 
 
+func _exit_tree() -> void:
+	if isDev:
+		print("Voxel Engine: Shutting down. Waiting for active background threads to finish...")
+	for task_id in active_thread_tasks:
+		WorkerThreadPool.wait_for_task_completion(task_id)
+	if isDev:
+		print("Voxel Engine: Clean asynchronous shutdown complete.")
+
+
 func _on_subdivision_requested(coord: Vector3i, lod_level: int) -> void:
 	subdivision_controller.request_subdivision(coord, lod_level)
 
 
-## Hook: Subdivides all chunks touching a spherical physical 3D radius
-func _impact_area_requested(world_position: Vector3, radius: float) -> void:
+## Hook: Subdivides all chunks touching a spherical radius
+func _on_structural_impact_area_requested(world_position: Vector3, radius: float) -> void:
 	var world_size = get_chunk_world_size()
 	
 	# Compute a bounding box in chunk-space coordinates
@@ -109,49 +121,104 @@ func _sanitize_world_settings() -> void:
 
 
 # ----------------------------
-# MAIN PROCESSING LOOP
+# MAIN PROCESSING LOOP (THREAD DISPATCHER)
 # ----------------------------
 func _process(_delta: float) -> void:
 	# Pull items from thread buffer array into active queue array safely
 	job_queue.flush()
-	
-	if not job_queue.queue.is_empty() and isDev:
-		print("Queue Check: Main queue has ", job_queue.queue.size(), " active jobs waiting!")
 
-	# Process slice-by-slice budget per frame
-	var jobs_per_frame := 2
-	for i in range(jobs_per_frame):
+	# Spin up background worker, for available jobs, up to worker count limit
+	while job_queue.queue.size() > 0 and active_thread_tasks.size() < workerCount:
 		var job = job_queue.pop()
 		if job == null:
 			break
-		if isDev:
-			print("Queue Check: Popped a job! Type: ", job.type, " Coord: ", job.chunk_coordinate)
-		execute(job)
+			
+		var task_id = WorkerThreadPool.add_task(
+			_async_worker_execute.bind(job), 
+			true, 
+			"VoxelGenTask_%s" % get_chunk_key(job.chunk_coordinate, job.lod_level)
+		)
+		active_thread_tasks.append(task_id)
 
-	# Asynchronous Queue Guard:
-	# Detect exactly when the initial batch has finished compiling and rendering to screenspace
+	# Clean out completed (background) thread handles
+	var i = active_thread_tasks.size() - 1
+	while i >= 0:
+		if WorkerThreadPool.is_task_completed(active_thread_tasks[i]):
+			active_thread_tasks.remove_at(i)
+		i -= 1
+
+	# 3. Asynchronous Queue Guard:
+	# Confirm that the initial batch has finished compiling, across all cores
 	if tracking_initial_gen and not initial_generation_cooked:
-		if job_queue.is_empty():
+		if job_queue.is_empty() and active_thread_tasks.is_empty():
 			initial_generation_cooked = true
 			tracking_initial_gen = false
 			if isDev:
-				print("Voxel Engine: Core queue empty. All initial base meshes are live on screen!")
+				print("Voxel Engine: True Async generation empty. All background meshes live!")
 			generation_completed.emit()
 
 
 # ----------------------------
-# DISPATCH
+# BACKGROUND THREAD EXECUTION BLOCK
 # ----------------------------
-func execute(job: ChunkJob) -> void:
-	if isDev: 
-		print("Mesh Builder: Compiling surface for chunk at ", job.chunk_coordinate)
+func _async_worker_execute(job: ChunkJob) -> void:
 	match job.type:
 		ChunkJob.JobType.GENERATE:
-			handle_generate(job)
+			_bg_thread_generate_voxels(job)
+
+
+func _bg_thread_generate_voxels(job: ChunkJob) -> void:
+	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
+
+	# HEAVY CALCULATIONS RUN ISOLATED HERE (No Scene Tree modification allowed!)
+	var voxel_data = terrain_generator.generate_data(
+		job.world_position,
+		chunk_size,
+		local_voxel_scale,
+		dimensions.y,
+		random,
+		colors,
+		job.lod_level
+	)
+	
+	job.data["voxels"] = voxel_data
+	
+	# Pass data back to main thread via deferred synchronization callback
+	_main_thread_instantiate_chunk.call_deferred(job)
 
 
 # ----------------------------
-# WORLD GENERATION BASICS
+# MAIN THREAD CALLBACK (Scene-Tree Safe Node Spawning)
+# ----------------------------
+func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
+	var coord = job.chunk_coordinate
+	var key = get_chunk_key(coord, job.lod_level)
+	
+	# Guard: ensure another thread hasn't built this node entry already
+	if chunks.has(key) and is_instance_valid(chunks[key]):
+		return
+
+	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
+	var chunk: Chunk = chunk_scene.instantiate()
+	chunk.position = job.world_position
+	chunk.voxel_size = local_voxel_scale
+	chunk.subdivision_level = job.lod_level
+	chunk.mat = chunk_material
+
+	add_child(chunk)
+	chunks[key] = chunk
+	
+	chunk.set_voxel_data(job.data["voxels"])
+	
+	if isDev:
+		_create_chunk_wireframe_bounds(chunk)
+		
+	process_chunk(chunk)
+	_link_subdivision_hierarchy(coord, chunk)
+
+
+# ----------------------------
+# BASELINE INITIALIZATION
 # ----------------------------
 func start_world_generation() -> void:
 	if isDev:
@@ -160,7 +227,6 @@ func start_world_generation() -> void:
 	tracking_initial_gen = true
 	initial_generation_cooked = false
 	
-	# Determine how many total chunks fit into defined world dimensions
 	var chunk_world_size = get_chunk_world_size()
 	var total_chunks_x = int(ceil(dimensions.x / chunk_world_size))
 	var total_chunks_y = int(ceil(dimensions.y / chunk_world_size))
@@ -180,8 +246,8 @@ func start_world_generation() -> void:
 					coord,
 					world_pos,
 					{},
-					1.0, # Priority
-					0   # Base LOD 0
+					1.0, 
+					0   
 				)
 				
 				job_queue.push(job)
@@ -189,48 +255,6 @@ func start_world_generation() -> void:
 				
 	if isDev:
 		print("Voxel Engine: Initial map queued successfully! Total chunks: ", total_queued)
-
-
-# ----------------------------
-# GENERATE CHUNK PIPELINE
-# ----------------------------
-func handle_generate(job: ChunkJob) -> void:
-	var coord = job.chunk_coordinate
-	var key = get_chunk_key(coord, job.lod_level)
-	
-	# CRITICAL GUARD: Prevents infinite duplication/flickering.
-	if chunks.has(key) and is_instance_valid(chunks[key]):
-		return
-
-	var world_pos = job.world_position
-	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
-
-	var voxel_data = terrain_generator.generate_data(
-		world_pos,
-		chunk_size,
-		local_voxel_scale,
-		dimensions.y,
-		random,
-		colors,
-		job.lod_level
-	)
-	
-	var chunk: Chunk = chunk_scene.instantiate()
-	chunk.position = world_pos
-	chunk.voxel_size = local_voxel_scale
-	chunk.subdivision_level = job.lod_level
-	chunk.mat = chunk_material
-
-	add_child(chunk)
-	chunks[key] = chunk
-	
-	chunk.set_voxel_data(voxel_data)
-	
-	if isDev:
-		_create_chunk_wireframe_bounds(chunk)
-		
-	process_chunk(chunk)
-	_link_subdivision_hierarchy(coord, chunk)
 
 
 # ----------------------------
@@ -246,7 +270,6 @@ func _link_subdivision_hierarchy(child_coord: Vector3i, child_chunk: Chunk) -> v
 		child_coord.z >> 1
 	)
 	
-	# Fetch with LOD step down
 	var parent_key = get_chunk_key(parent_coord, child_chunk.subdivision_level - 1)
 	if chunks.has(parent_key):
 		var parent_chunk: Chunk = chunks[parent_key]
