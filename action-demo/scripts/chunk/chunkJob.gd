@@ -1,3 +1,4 @@
+#./scripts/chunk/chunkJob.gd
 class_name ChunkJob extends RefCounted
 
 enum JobType {

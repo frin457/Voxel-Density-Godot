@@ -1,3 +1,4 @@
+#./scripts/chunk/chunk.gd
 class_name Chunk extends StaticBody3D
 
 @export var mat: Material
@@ -9,10 +10,10 @@ var voxels: Dictionary = {}
 
 var voxel_size: float = 1.0
 var subdivision_level: int = 0
+var visual_bounds_mesh: MeshInstance3D = null # Holds	 wireframe reference
 
 var mesh_dirty := false
 var collision_dirty := false
-
 
 func _ready() -> void:
 	meshInstance.mesh = ArrayMesh.new()
