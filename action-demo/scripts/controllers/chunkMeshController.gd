@@ -1,12 +1,6 @@
 # ./scripts/controllers/ChunkMeshController.gd
 #
 # Responsible only for converting voxel data into renderable geometry.
-#
-# Future improvements:
-# - Greedy meshing
-# - Partial chunk updates
-# - Multithreaded mesh generation
-# - Material batching
 
 class_name ChunkMeshController extends RefCounted
 
@@ -38,7 +32,6 @@ var cube_normals = {
 }
 
 func rebuild(chunk: Chunk) -> void:
-
 	if chunk.voxels.is_empty():
 		return
 
@@ -57,113 +50,62 @@ func rebuild(chunk: Chunk) -> void:
 		Vector3(-half_size,  half_size,  half_size),
 		Vector3( half_size,  half_size,  half_size),
 		Vector3( half_size,  half_size, -half_size),
-			Vector3(-half_size,  half_size, -half_size)
+		Vector3(-half_size,  half_size, -half_size)
 	]
 
 	for voxel_position in chunk.voxels.keys():
-
 		var world_position = Vector3(voxel_position) * chunk.voxel_size
 		var voxel = chunk.voxels[voxel_position]
 
 		if !has_neighbor(chunk, Face.FRONT, voxel_position):
-			add_face(
-				vertices,
-				normals,
-				colors,
-				Face.FRONT,
-				world_position,
-				voxel.color,
-				cube_vertices
-			)
+			add_face(vertices, normals, colors, Face.FRONT, world_position, voxel.color, cube_vertices)
 
 		if !has_neighbor(chunk, Face.BACK, voxel_position):
-			add_face(
-				vertices,
-				normals,
-				colors,
-				Face.BACK,
-				world_position,
-				voxel.color,
-				cube_vertices
-			)
+			add_face(vertices, normals, colors, Face.BACK, world_position, voxel.color, cube_vertices)
 
 		if !has_neighbor(chunk, Face.LEFT, voxel_position):
-			add_face(
-				vertices,
-				normals,
-				colors,
-				Face.LEFT,
-				world_position,
-				voxel.color,
-				cube_vertices
-			)
+			add_face(vertices, normals, colors, Face.LEFT, world_position, voxel.color, cube_vertices)
 
 		if !has_neighbor(chunk, Face.RIGHT, voxel_position):
-			add_face(
-				vertices,
-				normals,
-				colors,
-				Face.RIGHT,
-				world_position,
-				voxel.color,
-				cube_vertices
-			)
+			add_face(vertices, normals, colors, Face.RIGHT, world_position, voxel.color, cube_vertices)
 
 		if !has_neighbor(chunk, Face.BOTTOM, voxel_position):
-			add_face(
-				vertices,
-				normals,
-				colors,
-				Face.BOTTOM,
-				world_position,
-				voxel.color,
-				cube_vertices
-			)
+			add_face(vertices, normals, colors, Face.BOTTOM, world_position, voxel.color, cube_vertices)
 
 		if !has_neighbor(chunk, Face.TOP, voxel_position):
-			add_face(
-				vertices,
-				normals,
-				colors,
-				Face.TOP,
-				world_position,
-				voxel.color,
-				cube_vertices
-			)
+			add_face(vertices, normals, colors, Face.TOP, world_position, voxel.color, cube_vertices)
+
+	# If the chunk is empty/invisible, pass a null mesh to clear it out
+	if vertices.is_empty():
+		_apply_mesh_to_node.call_deferred(chunk, null)
+		return
 
 	var surface_array = []
 	surface_array.resize(Mesh.ARRAY_MAX)
-
 	surface_array[Mesh.ARRAY_VERTEX] = vertices
 	surface_array[Mesh.ARRAY_NORMAL] = normals
 	surface_array[Mesh.ARRAY_COLOR] = colors
 
-	if chunk.meshInstance.mesh == null:
-		chunk.meshInstance.mesh = ArrayMesh.new()
+	# FIX: Always generate a totally detached ArrayMesh on the thread.
+	var new_mesh = ArrayMesh.new()
+	new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_array)
+	new_mesh.surface_set_material(0, chunk.mat)
 
-	chunk.meshInstance.mesh.clear_surfaces()
-
-	chunk.meshInstance.mesh.add_surface_from_arrays(
-		Mesh.PRIMITIVE_TRIANGLES,
-		surface_array
-	)
-
-	chunk.meshInstance.mesh.surface_set_material(
-		0,
-		chunk.mat
-	)
-
-	chunk.mesh_dirty = false
+	# Safely defer the final Node mutation back to Godot's Main Thread
+	_apply_mesh_to_node.call_deferred(chunk, new_mesh)
 
 
-func has_neighbor(
-	chunk: Chunk,
-	face: Face,
-	position: Vector3i
-) -> bool:
+func _apply_mesh_to_node(chunk: Chunk, new_mesh: ArrayMesh) -> void:
+	# Ensure the chunk wasn't deleted while the thread was working
+	if is_instance_valid(chunk) and chunk.meshInstance:
+		chunk.meshInstance.mesh = new_mesh
+		
+	if chunk:
+		chunk.mesh_dirty = false
 
+
+func has_neighbor(chunk: Chunk, face: Face, position: Vector3i) -> bool:
 	var adjacent = position + Vector3i(cube_normals[face])
-
 	return chunk.voxels.has(adjacent)
 
 
@@ -178,17 +120,7 @@ func add_face(
 ) -> void:
 
 	for triangle in cube_indicies[face]:
-
 		for index in triangle:
-
-			vertices.append(
-				custom_vertices[index] + world_position
-			)
-
-			normals.append(
-				cube_normals[face]
-			)
-
-			colors.append(
-				color
-			)
+			vertices.append(custom_vertices[index] + world_position)
+			normals.append(cube_normals[face])
+			colors.append(color)

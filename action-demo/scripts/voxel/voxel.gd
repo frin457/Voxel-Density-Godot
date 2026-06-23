@@ -1,5 +1,4 @@
-# voxel.gd
-
+# ./scripts/voxel/voxel.gd
 class_name Voxel extends RefCounted
 
 var color: Color
