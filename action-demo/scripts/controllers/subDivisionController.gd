@@ -18,10 +18,11 @@ func request_subdivision(chunk_coord: Vector3i, target_level: int, wave_index: i
 	_execute_subdivision(chunk, chunk_coord, target_level, wave_index)
 
 
-## Public Hook: Merges children back into a parent chunk
-## Collapses 8 LOD 1 children back into their original baseline LOD 0 parent
-func request_merge(parent_coord: Vector3i) -> void:
-	var parent_key = manager.get_chunk_key(parent_coord, 0)
+#./scripts/controllers/subDivisionController.gd
+
+## Public Hook: Merges children back into a parent chunk at an arbitrary LOD level
+func request_merge(parent_coord: Vector3i, parent_lod: int = 0) -> void:
+	var parent_key = manager.get_chunk_key(parent_coord, parent_lod)
 	
 	if not manager.chunks.has(parent_key):
 		return
@@ -30,10 +31,12 @@ func request_merge(parent_coord: Vector3i) -> void:
 	if not is_instance_valid(parent_chunk):
 		return
 
-	print("Subdivision Controller: Collapsing 8 children of parent ", parent_coord)
+	if manager.isDev:
+		print("Subdivision Controller: Collapsing children of parent ", parent_coord, " at LOD ", parent_lod)
 		
-	# 1. Clear out children chunk elements from the global registry and scene tree
-	# Query global registry keys directly to catch unlinked/delayed thread orphans
+	var child_lod = parent_lod + 1
+		
+	# 1. Clear children chunks from the global registry and scene tree
 	for x in range(2):
 		for y in range(2):
 			for z in range(2):
@@ -42,30 +45,34 @@ func request_merge(parent_coord: Vector3i) -> void:
 					parent_coord.y * 2 + y,
 					parent_coord.z * 2 + z
 				)
-				var child_key = manager.get_chunk_key(child_coord, 1)
+				var child_key = manager.get_chunk_key(child_coord, child_lod)
 				if manager.chunks.has(child_key):
+					#RECURSIVE CLEAN: If this child has its own children (e.g. LOD 2), collapse them first!
+					request_merge(child_coord, child_lod)
+					
 					var child_chunk = manager.chunks[child_key]
 					if is_instance_valid(child_chunk):
 						child_chunk.queue_free()
 					manager.chunks.erase(child_key)
 				
-	# 2. Fallback sweep: Free any remaining structural node links inside the array
+	# 2. Fallback : Free remaining structural node links inside the array
 	for child in parent_chunk.child_chunks:
 		if is_instance_valid(child):
 			child.queue_free()
 			
 	parent_chunk.child_chunks.clear()
 	
-	# 3. Restore the parent baseline
+	# 3. Restore parent baseline
 	parent_chunk.activate()
 	
-	# FORCE THE MESH AND VISUAL ARRAYS TO BE RERENDERED IMMEDIATELY
+	# Force immediate re-render
 	if parent_chunk.has_method("set_mesh_dirty"):
 		parent_chunk.set_mesh_dirty(true)
 	else:
 		parent_chunk.mesh_dirty = true
 		
 	manager.process_chunk(parent_chunk)
+
 
 # ----------------------------
 # INTERNAL PROCESSING
