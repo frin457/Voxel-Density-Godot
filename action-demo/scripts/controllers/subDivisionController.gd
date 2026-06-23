@@ -156,3 +156,24 @@ func debug_force_subdivide_center() -> void:
 
 	print("Subdivision TEST: forcing subdivision on ", center)
 	request_subdivision(center, 1)
+
+
+func subdivision_complete(
+	parent_coord: Vector3i,
+	target_level: int
+) -> void:
+
+	var request_key = "%s_%d" % [
+		parent_coord,
+		target_level
+	]
+
+	pending_subdivisions.erase(request_key)
+
+	if manager.isDev:
+		print(
+			"Subdivision complete: ",
+			parent_coord,
+			" LOD ",
+			target_level
+		)

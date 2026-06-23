@@ -279,10 +279,16 @@ func _link_subdivision_hierarchy(child_coord: Vector3i, child_chunk: Chunk) -> v
 	if chunks.has(parent_key):
 		var parent_chunk: Chunk = chunks[parent_key]
 		child_chunk.parent_chunk = parent_chunk
+		if child_chunk in parent_chunk.child_chunks:
+			return
 		parent_chunk.child_chunks.append(child_chunk)
 		
 		if parent_chunk.child_chunks.size() == 8:
 			parent_chunk.deactivate()
+			subdivision_controller.subdivision_complete(
+				parent_coord,
+				child_chunk.subdivision_level
+			)
 
 
 # ----------------------------
