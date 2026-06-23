@@ -1,4 +1,3 @@
-#./scripts/chunk/chunkManager.gd
 class_name ChunkManager extends Node
 
 # Global Parameters 
@@ -28,8 +27,10 @@ var query_controller: QueryController
 	Color.GREEN_YELLOW
 ]
 
-# Job system
+# Job / update systems
 var job_queue := ChunkJobQueue.new()
+var dirty_chunks: Array[Chunk] = []
+@export var max_dirty_chunks_per_frame := 4
 
 # World state - Accepts compound keys or Vector4i equivalent strings
 var chunks: Dictionary = {}
@@ -124,7 +125,7 @@ func _sanitize_world_settings() -> void:
 
 
 # ----------------------------
-# MAIN PROCESSING LOOP (THREAD DISPATCHER)
+# MAIN PROCESSING LOOP (THREAD & DIRTY QUEUE DISPATCHER)
 # ----------------------------
 func _process(_delta: float) -> void:
 	# Pull items from thread buffer array into active queue array safely
@@ -148,15 +149,22 @@ func _process(_delta: float) -> void:
 	while i >= 0:
 		var task_id = active_thread_tasks[i]
 		if WorkerThreadPool.is_task_completed(task_id):
-			# This triggers the engine to safely deallocate the task and its bound references
 			WorkerThreadPool.wait_for_task_completion(task_id)
 			active_thread_tasks.remove_at(i)
 		i -= 1
 
+	# --- CONSUME DIRTY CHUNKS (FRAME BUDGETED REBUILDING) ---
+	var chunks_processed_this_frame := 0
+	while dirty_chunks.size() > 0 and chunks_processed_this_frame < max_dirty_chunks_per_frame:
+		var chunk = dirty_chunks.pop_front() # Processes oldest dirty chunks first
+		if is_instance_valid(chunk):
+			process_chunk(chunk)
+			chunks_processed_this_frame += 1
+
 	# Async Guard:
-	# Confirm that the initial batch has finished compiling...
+	# Confirm that the initial batch has finished compiling AND all dirty meshes have baked...
 	if tracking_initial_gen and not initial_generation_cooked:
-		if job_queue.is_empty() and active_thread_tasks.is_empty():
+		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_chunks.is_empty():
 			initial_generation_cooked = true
 			tracking_initial_gen = false
 			if isDev:
@@ -167,15 +175,13 @@ func _process(_delta: float) -> void:
 # BACKGROUND THREAD EXECUTION BLOCK
 # ----------------------------
 func _async_worker_execute(job: ChunkJob) -> void:
-	match job.type:
-		ChunkJob.JobType.GENERATE:
-			_bg_thread_generate_voxels(job)
+	if job.type == ChunkJob.JobType.GENERATE:
+		_bg_thread_generate_voxels(job)
 
 
 func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
 
-	# HEAVY CALCULATIONS RUN ISOLATED HERE (No Scene Tree modification allowed!)
 	var voxel_data = terrain_generator.generate_data(
 		job.world_position,
 		chunk_size,
@@ -187,8 +193,6 @@ func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 	)
 	
 	job.data["voxels"] = voxel_data
-	
-	# Pass data back to main thread via deferred synchronization callback
 	_main_thread_instantiate_chunk.call_deferred(job)
 
 
@@ -199,7 +203,6 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	var coord = job.chunk_coordinate
 	var key = get_chunk_key(coord, job.lod_level)
 	
-	# Guard: ensure another thread hasn't built this node entry already
 	if chunks.has(key) and is_instance_valid(chunks[key]):
 		return
 
@@ -213,12 +216,12 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	add_child(chunk)
 	chunks[key] = chunk
 	
+	# Calling set_voxel_data calls mark_dirty(), which queues it for a smooth, frame-budgeted mesh bake
 	chunk.set_voxel_data(job.data["voxels"])
 	
 	if isDev:
 		_create_chunk_wireframe_bounds(chunk)
 		
-	process_chunk(chunk)
 	_link_subdivision_hierarchy(coord, chunk)
 
 
@@ -290,9 +293,8 @@ func _link_subdivision_hierarchy(child_coord: Vector3i, child_chunk: Chunk) -> v
 				child_chunk.subdivision_level
 			)
 
-
 # ----------------------------
-# PROCESS CHUNK MESHER
+# PROCESS CHUNK MESHER (CONSUMER)
 # ----------------------------
 func process_chunk(chunk: Chunk) -> void:
 	if chunk.mesh_dirty:
@@ -302,6 +304,16 @@ func process_chunk(chunk: Chunk) -> void:
 		collision_controller.rebuild(chunk)
 
 	chunk.clear_dirty()
+
+
+func queue_dirty_chunk(chunk: Chunk) -> void:
+	if not is_instance_valid(chunk):
+		return
+
+	if dirty_chunks.has(chunk):
+		return
+
+	dirty_chunks.append(chunk)
 
 
 # ----------------------------

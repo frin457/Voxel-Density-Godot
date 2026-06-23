@@ -93,21 +93,22 @@ func update_lod(camera: Camera3D) -> void:
 	var upgrades_dispatched = 0
 	var downgrades_dispatched = 0
 
-	var chunk_keys = manager.chunks.keys()
-	for key in chunk_keys:
-		if not "_LOD0" in key:
-			continue 
+	var coords_to_evaluate := []
+	for coord in target_lod_map:
+		coords_to_evaluate.append(coord)
+	for coord in requested_lod_map:
+		if not target_lod_map.has(coord):
+			coords_to_evaluate.append(coord)
+
+	for chunk_coord in coords_to_evaluate:
+		var key = manager.get_chunk_key(chunk_coord, 0)
+		if not manager.chunks.has(key):
+			continue
 			
 		var base_chunk = manager.chunks[key] as Chunk
 		if not is_instance_valid(base_chunk):
 			continue
 			
-		var chunk_coord = Vector3i(
-			round(base_chunk.position.x / chunk_world_size),
-			round(base_chunk.position.y / chunk_world_size),
-			round(base_chunk.position.z / chunk_world_size)
-		)
-		
 		var desired_lod = target_lod_map.get(chunk_coord, 0)
 		
 		var current_lod = 0
@@ -118,38 +119,49 @@ func update_lod(camera: Camera3D) -> void:
 					current_lod = 2
 					break
 
+		# If we have successfully achieved our desired LOD state, clear our tracking history
 		if desired_lod == current_lod:
 			if requested_lod_map.get(chunk_coord, -1) == current_lod:
 				requested_lod_map.erase(chunk_coord)
 			continue
-			
-		if requested_lod_map.get(chunk_coord, -1) == desired_lod:
-			continue
-			
-		if chunk_coord != center_coord:
-			if desired_lod > current_lod:
-				if upgrades_dispatched >= MAX_UPGRADES_PER_FRAME:
-					continue
-			else:
-				if downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME:
-					continue
 
+		# FIXED: Enforce a strict incremental single-step state transition loop.
+		# This completely avoids simultaneous double-merges or double-subdivisions.
 		if desired_lod > current_lod:
-			_upgrade_chunk_lod(chunk_coord, current_lod, desired_lod)
-			upgrades_dispatched += 1
-		else:
-			_downgrade_chunk_lod(chunk_coord, current_lod, desired_lod)
-			downgrades_dispatched += 1
+			var next_lod = current_lod + 1
 			
-		requested_lod_map[chunk_coord] = desired_lod
+			# If we've already dispatched a request for this step, wait for it to build
+			if requested_lod_map.get(chunk_coord, -1) == next_lod:
+				continue
+				
+			if chunk_coord != center_coord and upgrades_dispatched >= MAX_UPGRADES_PER_FRAME:
+				continue
+				
+			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod)
+			upgrades_dispatched += 1
+			requested_lod_map[chunk_coord] = next_lod
+		else:
+			var next_lod = current_lod - 1
+			
+			# If we've already dispatched a request for this step, wait for it to collapse
+			if requested_lod_map.get(chunk_coord, -1) == next_lod:
+				continue
+				
+			if chunk_coord != center_coord and downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME:
+				continue
+				
+			_downgrade_chunk_lod(chunk_coord, current_lod, next_lod)
+			downgrades_dispatched += 1
+			requested_lod_map[chunk_coord] = next_lod
 
 
+# Upgrades are now strictly single-step (0 -> 1 OR 1 -> 2)
 func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
-	if from_lod == 0 and to_lod >= 1:
+	if from_lod == 0 and to_lod == 1:
 		if _chunk_contains_surfaces(coord, 1):
 			manager.subdivision_controller.request_subdivision(coord, 1)
 		
-	if to_lod == 2:
+	elif from_lod == 1 and to_lod == 2:
 		for x in range(2):
 			for y in range(2):
 				for z in range(2):
@@ -162,8 +174,9 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 						manager.subdivision_controller.request_subdivision(child_coord, 2)
 
 
+# Downgrades are now strictly single-step (2 -> 1 OR 1 -> 0)
 func _downgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
-	if from_lod == 2 and to_lod <= 1:
+	if from_lod == 2 and to_lod == 1:
 		for x in range(2):
 			for y in range(2):
 				for z in range(2):
@@ -174,7 +187,7 @@ func _downgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 					)
 					manager.subdivision_controller.request_merge(child_coord, 1)
 		
-	if to_lod == 0:
+	elif from_lod == 1 and to_lod == 0:
 		manager.subdivision_controller.request_merge(coord, 0)
 
 
@@ -188,15 +201,19 @@ func _chunk_contains_surfaces(coord: Vector3i, target_lod: int) -> bool:
 				return not chunk.is_empty_air
 				
 	elif target_lod == 2:
-		# Map the target LOD 1 grid cell coordinate back to its parent LOD 0 coordinate
 		var parent_coord = Vector3i(coord.x >> 1, coord.y >> 1, coord.z >> 1)
 		var parent_key = manager.get_chunk_key(parent_coord, 0)
 		
 		if manager.chunks.has(parent_key):
 			var parent_chunk = manager.chunks[parent_key] as Chunk
 			if is_instance_valid(parent_chunk):
-				# Isolate lowest bit to get local offset index (0 or 1)
 				var local_offset = Vector3i(coord.x & 1, coord.y & 1, coord.z & 1)
-				return parent_chunk.sub_quadrant_has_surfaces.get(local_offset, true)
+				return parent_quadrant_has_surfaces(parent_chunk, local_offset)
 				
-	return true # Fallback safety to prevent gaps if data isn't loaded yet
+	return true 
+
+func parent_quadrant_has_surfaces(parent_chunk: Chunk, local_offset: Vector3i) -> bool:
+	if not parent_chunk.get("sub quadrant has faces") != null:
+	#if not parent_chunk.get("sub_quadrant_has_surfaces") != null:
+		return parent_chunk.sub_quadrant_has_surfaces.get(local_offset, true)
+	return true
