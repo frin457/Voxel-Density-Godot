@@ -1,14 +1,33 @@
-#./scripts/controllers/playerLODController.gd
-class_name PlayerLODController extends RefCounted
+# ./scripts/controllers/playerLODController.gd
+class_name PlayerLODController extends Node 
 
-var manager: ChunkManager
+## If empty, automatically try find a parent ChunkManager.
+@export var manager: ChunkManager
+
 var last_tracked_coord := Vector3i(999999, 999999, 999999)
 
-func _init(_manager: ChunkManager) -> void:
-	manager = _manager
+func _ready() -> void:
+	# check heritage nodes for a ChunkManager.
+	if not manager:
+		manager = get_parent() as ChunkManager
+		if not manager and get_parent():
+			manager = get_parent().get_parent() as ChunkManager
+			
+	if not manager:
+		push_error("PlayerLODController Error: Could not find a ChunkManager! Please add ChunkManager.gd to a child node of the world.")
 
-## Main execution hook called from ChunkManager's process loop
-func update_lod(player_position: Vector3) -> void:
+func _process(_delta: float) -> void:
+	if not manager:
+		return
+		
+	# Tracks the camera viewport, currently being used
+	var camera = get_viewport().get_camera_3d()
+	if camera:
+		update_lod(camera) # Explicitly pass the camera for view culling
+
+## Hook for handling the grid logic and view culling
+func update_lod(camera: Camera3D) -> void:
+	var player_position = camera.global_position
 	var chunk_world_size = manager.get_chunk_world_size()
 	
 	# 1. Determine player's current baseline LOD 0 chunk coordinate
@@ -18,51 +37,58 @@ func update_lod(player_position: Vector3) -> void:
 		floor(player_position.z / chunk_world_size)
 	)
 	
-	# OPTIMIZATION: Only update if the player has actually crossed into a new LOD 0 chunk
-	if center_coord == last_tracked_coord:
-		return
+	# State machine actively audits chunks every frame
+	# to catch and clean up late-arriving async threads.
 	last_tracked_coord = center_coord
 	
-	# 2. Define target states for our 3x3 layout matrix around the player
-	# Key: Vector3i (LOD 0 coordinate) -> Value: int (Desired LOD Level)
-	var target_lod_map := {}
+	# Get normalized forward direction vector of the camera
+	var camera_forward = -camera.global_transform.basis.z.normalized()
 	
-	# Loop through a 3x3 horizontally. We include y from -1 to 1 to give a vertical 
-	# cushion so chunks don't aggressively blink out if the player jumps/flies.
-	for x in range(-1, 2):
-		for z in range(-1, 2):
-			for y in range(-1, 2):
+	# 2. Define target states for our X by Z layout matrix around the player
+	var target_lod_map := {}
+	const rangeMin = -1
+	const rangeMax = 1
+	for x in range(rangeMin,rangeMax):
+		for z in range(rangeMin,rangeMax):
+			for y in range(-1,1): # Vertical cushion layer
 				var offset_coord = center_coord + Vector3i(x, y, z)
 				
 				if x == 0 and y == 0 and z == 0:
-					target_lod_map[offset_coord] = 2 # Center chunk 'e' goes up 2 steps (LOD 2)
+					target_lod_map[offset_coord] = 2 #  chunk resolution increases 2 steps (LOD 2)
 				else:
-					# Surrounding chunks 'a, b, c, d, f, g, h, i' go up 1 step (LOD 1)
-					# Protect center assignment from inner-loop overrides
+					# Surrounding chunks go up 1 step (LOD 1) when within view of the camera
 					if not target_lod_map.has(offset_coord):
-						target_lod_map[offset_coord] = 1
+						# Calculate the absolute world center position of this surrounding chunk
+						var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
+						var dir_to_chunk = (chunk_center_world - player_position).normalized()
+						
+						# Cone Visibility Check via Dot Product:
+						# 1.0 = centered, 0.0 = perpendicular. 0.4 creates a  ~132° peripheral view cone.
+						var is_in_view = camera_forward.dot(dir_to_chunk) > 0.4
+						
+						if is_in_view:
+							target_lod_map[offset_coord] = 1 # Directly in front of camera -> Keep detailed
+						else:
+							target_lod_map[offset_coord] = 0 # Behind camera -> Drop to LOD 0
 
 	# 3. Evaluate every base chunk currently registered in the manager
 	var chunk_keys = manager.chunks.keys()
 	for key in chunk_keys:
 		if not "_LOD0" in key:
-			continue # Only evaluate from baseline parent registries
+			continue 
 			
 		var base_chunk = manager.chunks[key] as Chunk
 		if not is_instance_valid(base_chunk):
 			continue
 			
-		# Deconstruct chunk coordinate from its position scale
 		var chunk_coord = Vector3i(
 			round(base_chunk.position.x / chunk_world_size),
 			round(base_chunk.position.y / chunk_world_size),
 			round(base_chunk.position.z / chunk_world_size)
 		)
 		
-		# Get desired LOD (default to 0 if out of the 3x3 grid)
 		var desired_lod = target_lod_map.get(chunk_coord, 0)
 		
-		# Figure out current structural runtime LOD depth
 		var current_lod = 0
 		if base_chunk.child_chunks.size() == 8:
 			current_lod = 1
@@ -85,9 +111,6 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 		manager.subdivision_controller.request_subdivision(coord, 1)
 		
 	if to_lod == 2:
-		# Subdivide the 8 expected children from LOD 1 to LOD 2
-		# NOTE: If LOD 1 threads haven't finished yet, the subdivision controller 
-		# will cleanly guard-return early and retry safely on subsequent frames.
 		for x in range(2):
 			for y in range(2):
 				for z in range(2):
@@ -101,11 +124,9 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 
 func _downgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 	if to_lod == 0:
-		# Collapse everything entirely back to the baseline parent
 		manager.subdivision_controller.request_merge(coord, 0)
 		
 	elif to_lod == 1 and from_lod == 2:
-		# Collapse grandchildren (LOD 2) but preserve the child layer (LOD 1)
 		for x in range(2):
 			for y in range(2):
 				for z in range(2):

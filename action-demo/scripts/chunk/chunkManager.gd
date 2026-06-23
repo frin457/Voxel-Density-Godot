@@ -163,7 +163,6 @@ func _process(_delta: float) -> void:
 				print("Voxel Engine: True Async generation empty. All background meshes live!")
 			generation_completed.emit()
 
-
 # ----------------------------
 # BACKGROUND THREAD EXECUTION BLOCK
 # ----------------------------
