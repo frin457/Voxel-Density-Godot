@@ -153,16 +153,21 @@ func _process(_delta: float) -> void:
 			active_thread_tasks.remove_at(i)
 		i -= 1
 
-	# --- CONSUME DIRTY CHUNKS (FRAME BUDGETED REBUILDING) ---
-	var chunks_processed_this_frame := 0
-	while dirty_chunks.size() > 0 and chunks_processed_this_frame < max_dirty_chunks_per_frame:
+	# --- CONSUME DIRTY CHUNKS ---
+	var frame_start_time := Time.get_ticks_usec()
+	var max_allowed_budget_usec := 2000 # 2.0 milliseconds max per frame allocated to dispatch tasks
+
+	while dirty_chunks.size() > 0:
+		# Check if dispatching more tasks risks pushing us over our frame budget time
+		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
+			break # Roll over remaining dirty allocations to the next frame
+			
 		var chunk = dirty_chunks.pop_front() # Processes oldest dirty chunks first
 		if is_instance_valid(chunk):
 			process_chunk(chunk)
-			chunks_processed_this_frame += 1
 
 	# Async Guard:
-	# Confirm that the initial batch has finished compiling AND all dirty meshes have baked...
+	# Confirm initial batch has finished compiling AND dirty meshes have baked...
 	if tracking_initial_gen and not initial_generation_cooked:
 		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_chunks.is_empty():
 			initial_generation_cooked = true
@@ -286,13 +291,6 @@ func _link_subdivision_hierarchy(child_coord: Vector3i, child_chunk: Chunk) -> v
 		if child_chunk in parent_chunk.child_chunks:
 			return
 		parent_chunk.child_chunks.append(child_chunk)
-		
-		if parent_chunk.child_chunks.size() == 8:
-			parent_chunk.deactivate()
-			subdivision_controller.subdivision_complete(
-				parent_coord,
-				child_chunk.subdivision_level
-			)
 
 # ----------------------------
 # PROCESS CHUNK MESHER (CONSUMER)
@@ -303,8 +301,6 @@ func process_chunk(chunk: Chunk) -> void:
 
 	if chunk.collision_dirty:
 		collision_controller.rebuild(chunk)
-
-	chunk.clear_dirty()
 
 
 func queue_dirty_chunk(chunk: Chunk) -> void:
@@ -321,25 +317,31 @@ func queue_dirty_chunk(chunk: Chunk) -> void:
 # CHUNK WIREFRAMES (DEBUG ONLY)
 # ----------------------------
 func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
-	var world_size = chunk_size * chunk.voxel_size
+	# Calculate the absolute world size of this chunk's bounding box
+	var world_size = float(chunk_size) * chunk.voxel_size 
 
-	var half_voxel = chunk.voxel_size * 0.5
-	var min_p = Vector3.ONE * -half_voxel
-	var max_p = Vector3.ONE * (world_size - half_voxel)
+	# Keep wireframes locked to the absolute AABB corners
+	var min_p = Vector3.ZERO
+	var max_p = Vector3.ONE * world_size
 
 	var line_vertices := PackedVector3Array()
 	var append_line = func(from: Vector3, to: Vector3):
 		line_vertices.append(from)
 		line_vertices.append(to)
 
+	# Bottom Face
 	append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, max_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, max_p.z))
 	append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, min_p.z))
+	
+	# Top Face
 	append_line.call(Vector3(min_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, max_p.z))
 	append_line.call(Vector3(max_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
 	append_line.call(Vector3(min_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, min_p.z))
+	
+	# Vertical Pillars
 	append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(min_p.x, max_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(max_p.x, max_p.y, max_p.z))

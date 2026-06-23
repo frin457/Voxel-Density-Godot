@@ -1,126 +1,114 @@
-# ./scripts/controllers/ChunkMeshController.gd
-#
-# Responsible only for converting voxel data into renderable geometry.
-
+# ./scripts/controllers/chunkMeshController.gd
 class_name ChunkMeshController extends RefCounted
 
-enum Face {
-	BOTTOM,
-	FRONT,
-	RIGHT,
-	TOP,
-	LEFT,
-	BACK
-}
+# Tracks chunks currently undergoing background meshing tasks to prevent duplicate threads
+var active_mesh_tasks := {}
 
-var cube_indicies = {
-	Face.FRONT : [[0,4,5],[0,5,1]],
-	Face.BACK  : [[2,7,3],[2,6,7]],
-	Face.LEFT  : [[3,7,4],[3,4,0]],
-	Face.RIGHT : [[1,5,6],[1,6,2]],
-	Face.BOTTOM: [[0,1,2],[0,2,3]],
-	Face.TOP   : [[4,7,6],[4,6,5]]
-}
-
-var cube_normals = {
-	Face.FRONT  : Vector3(0,0,1),
-	Face.BACK   : Vector3(0,0,-1),
-	Face.LEFT   : Vector3(-1,0,0),
-	Face.RIGHT  : Vector3(1,0,0),
-	Face.BOTTOM : Vector3(0,-1,0),
-	Face.TOP    : Vector3(0,1,0)
-}
-
+## Entry point called by ChunkManager
 func rebuild(chunk: Chunk) -> void:
-	if chunk.voxels.is_empty():
+	if not is_instance_valid(chunk):
+		return
+		
+	# If this chunk is already being meshed on a thread, do not spin up another one
+	if active_mesh_tasks.has(chunk):
 		return
 
+	# CRITICAL FOR THREAD SAFETY: Dictionaries are not thread-safe in Godot 4 if modified
+	# during iteration. We duplicate the live voxel dictionary instantly on the main thread 
+	# to act as an immutable snapshot for our worker thread.
+	var voxel_snapshot := chunk.voxels.duplicate()
+	var chunk_size := chunk.chunk_size
+	var voxel_size := chunk.voxel_size
+	var mesh_instance := chunk.meshInstance
+	var material := chunk.mat
+
+	# Dispatch surface extraction to a background thread
+	var task_id = WorkerThreadPool.add_task(
+		_async_extract_surface.bind(chunk, voxel_snapshot, chunk_size, voxel_size, mesh_instance, material),
+		true,
+		"MeshExtract_%X" % chunk.get_instance_id()
+	)
+	active_mesh_tasks[chunk] = task_id
+
+
+## Executed entirely on a BACKGROUND WORKER THREAD
+func _async_extract_surface(
+	chunk: Chunk, 
+	voxels: Dictionary, 
+	size: int, 
+	scale: float, 
+	mesh_instance: MeshInstance3D, 
+	material: Material
+) -> void:
+	
+	# -------------------------------------------------------------
+	# PLACE YOUR SURFACE EXTRACTION LOOPS HERE (Marching Cubes, Greedy Meshing, etc.)
+	# -------------------------------------------------------------
 	var vertices := PackedVector3Array()
+	var indices := PackedInt32Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 
-	var half_size = chunk.voxel_size * 0.5
+	# --- Example Loop Structure Placeholder ---
+	# For demonstration purposes. Replace this loop with your actual voxel iteration 
+	# and face building logic using the 'voxels', 'size', and 'scale' passed parameters.
+	for pos in voxels:
+		var voxel = voxels[pos]
+		# Build your faces, vertices, indices, normals, and colors here...
+		pass
+	# -------------------------------------------------------------
 
-	var cube_vertices = [
-		Vector3(-half_size, -half_size,  half_size),
-		Vector3( half_size, -half_size,  half_size),
-		Vector3( half_size, -half_size, -half_size),
-		Vector3(-half_size, -half_size, -half_size),
+	# Package arrays for transmission
+	var surface_arrays := []
+	surface_arrays.resize(Mesh.ARRAY_MAX)
+	
+	if vertices.size() > 0:
+		surface_arrays[Mesh.ARRAY_VERTEX] = vertices
+		surface_arrays[Mesh.ARRAY_INDEX] = indices
+		surface_arrays[Mesh.ARRAY_NORMAL] = normals
+		surface_arrays[Mesh.ARRAY_COLOR] = colors
 
-		Vector3(-half_size,  half_size,  half_size),
-		Vector3( half_size,  half_size,  half_size),
-		Vector3( half_size,  half_size, -half_size),
-		Vector3(-half_size,  half_size, -half_size)
-	]
+	# Safely hand off the extracted vertex arrays back to the main thread for rendering
+	_main_thread_commit_mesh.call_deferred(chunk, surface_arrays, mesh_instance, material)
 
-	for voxel_position in chunk.voxels.keys():
-		var world_position = Vector3(voxel_position) * chunk.voxel_size
-		var voxel = chunk.voxels[voxel_position]
 
-		if !has_neighbor(chunk, Face.FRONT, voxel_position):
-			add_face(vertices, normals, colors, Face.FRONT, world_position, voxel.color, cube_vertices)
+## Executed back on the MAIN THREAD (Scene-tree safe operations)
+func _main_thread_commit_mesh(
+	chunk: Chunk, 
+	surface_arrays: Array, 
+	mesh_instance: MeshInstance3D, 
+	material: Material
+) -> void:
+	
+	# Clean up tracking immediately
+	active_mesh_tasks.erase(chunk)
 
-		if !has_neighbor(chunk, Face.BACK, voxel_position):
-			add_face(vertices, normals, colors, Face.BACK, world_position, voxel.color, cube_vertices)
-
-		if !has_neighbor(chunk, Face.LEFT, voxel_position):
-			add_face(vertices, normals, colors, Face.LEFT, world_position, voxel.color, cube_vertices)
-
-		if !has_neighbor(chunk, Face.RIGHT, voxel_position):
-			add_face(vertices, normals, colors, Face.RIGHT, world_position, voxel.color, cube_vertices)
-
-		if !has_neighbor(chunk, Face.BOTTOM, voxel_position):
-			add_face(vertices, normals, colors, Face.BOTTOM, world_position, voxel.color, cube_vertices)
-
-		if !has_neighbor(chunk, Face.TOP, voxel_position):
-			add_face(vertices, normals, colors, Face.TOP, world_position, voxel.color, cube_vertices)
-
-	# If the chunk is empty/invisible, pass a null mesh to clear it out
-	if vertices.is_empty():
-		_apply_mesh_to_node.call_deferred(chunk, null)
+	# Safety check in case the chunk was freed/cleared while threading was active
+	if not is_instance_valid(chunk) or not is_instance_valid(mesh_instance):
 		return
 
-	var surface_array = []
-	surface_array.resize(Mesh.ARRAY_MAX)
-	surface_array[Mesh.ARRAY_VERTEX] = vertices
-	surface_array[Mesh.ARRAY_NORMAL] = normals
-	surface_array[Mesh.ARRAY_COLOR] = colors
+	var array_mesh = mesh_instance.mesh as ArrayMesh
+	if not array_mesh:
+		array_mesh = ArrayMesh.new()
+		mesh_instance.mesh = array_mesh
 
-	# FIX: Always generate a totally detached ArrayMesh on the thread.
-	var new_mesh = ArrayMesh.new()
-	new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_array)
-	new_mesh.surface_set_material(0, chunk.mat)
+	# Clear previous geometry surfaces
+	while array_mesh.get_surface_count() > 0:
+		array_mesh.remove_surface(0)
 
-	# Safely defer the final Node mutation back to Godot's Main Thread
-	_apply_mesh_to_node.call_deferred(chunk, new_mesh)
+	# Commit new geometry if valid surfaces were built
+	if surface_arrays[Mesh.ARRAY_VERTEX] != null and surface_arrays[Mesh.ARRAY_VERTEX].size() > 0:
+		array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
+		mesh_instance.set_surface_override_material(0, material)
 
-
-func _apply_mesh_to_node(chunk: Chunk, new_mesh: ArrayMesh) -> void:
-	# Ensure the chunk wasn't deleted while the thread was working
-	if is_instance_valid(chunk) and chunk.meshInstance:
-		chunk.meshInstance.mesh = new_mesh
-		
-	if chunk:
-		chunk.mesh_dirty = false
+	# Tell the chunk its mesh is clean.
+	chunk.mesh_dirty = false
+	
+	# Evaluate if both rendering and physics are ready to release the block
+	_evaluate_chunk_readiness(chunk)
 
 
-func has_neighbor(chunk: Chunk, face: Face, position: Vector3i) -> bool:
-	var adjacent = position + Vector3i(cube_normals[face])
-	return chunk.voxels.has(adjacent)
-
-
-func add_face(
-	vertices: PackedVector3Array,
-	normals: PackedVector3Array,
-	colors: PackedColorArray,
-	face: Face,
-	world_position: Vector3,
-	color: Color,
-	custom_vertices: Array
-) -> void:
-
-	for triangle in cube_indicies[face]:
-		for index in triangle:
-			vertices.append(custom_vertices[index] + world_position)
-			normals.append(cube_normals[face])
-			colors.append(color)
+func _evaluate_chunk_readiness(chunk: Chunk) -> void:
+	# Only mark the chunk as fully cleared once BOTH physics and mesh generation threads finish
+	if not chunk.mesh_dirty and not chunk.collision_dirty:
+		chunk.clear_dirty()
