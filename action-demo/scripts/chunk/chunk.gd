@@ -58,10 +58,26 @@ func clear_dirty() -> void:
 
 
 func set_voxel_data(data: Dictionary) -> void:
-	# Permanent source state.
-	original_voxels = data.duplicate(true)
-	# Runtime state.
-	voxels = data.duplicate(true)
+	original_voxels.clear()
+	voxels.clear()
+	
+	for pos in data:
+		var src_voxel = data[pos] as Voxel
+		
+		# Create separate instances for the baseline and live states
+		var backup = Voxel.new(src_voxel.color)
+		backup.health = src_voxel.health
+		backup.density = src_voxel.density
+		backup.material_type = src_voxel.material_type
+		
+		var live = Voxel.new(src_voxel.color)
+		live.health = src_voxel.health
+		live.density = src_voxel.density
+		live.material_type = src_voxel.material_type
+		
+		original_voxels[pos] = backup
+		voxels[pos] = live
+		
 	mark_dirty()
 
 

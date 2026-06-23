@@ -43,9 +43,11 @@ var tracking_initial_gen: bool = false
 var active_thread_tasks: Array[int] = []
 
 # Decoupled entry points for ANY external script
-signal subdivision_requested(coord: Vector3i, target_level: int)
+signal subdivision_requested(coord: Vector3i, target_level: int, wave_index: int)
+signal merge_requested(coord: Vector3i)
 signal generation_requested()
 signal generation_completed()
+
 
 var random := FastNoiseLite.new()
 var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
@@ -67,6 +69,7 @@ func _ready() -> void:
 	
 	# Connect signals directly to controller methods to bypass lambda execution delays
 	subdivision_requested.connect(subdivision_controller.request_subdivision)
+	merge_requested.connect(subdivision_controller.request_merge)
 	generation_requested.connect(start_world_generation)
 
 
@@ -140,15 +143,18 @@ func _process(_delta: float) -> void:
 		)
 		active_thread_tasks.append(task_id)
 
-	# Clean out completed (background) thread handles
+	# Clean completed thread handles AND free their memory slots
 	var i = active_thread_tasks.size() - 1
 	while i >= 0:
-		if WorkerThreadPool.is_task_completed(active_thread_tasks[i]):
+		var task_id = active_thread_tasks[i]
+		if WorkerThreadPool.is_task_completed(task_id):
+			# This triggers the engine to safely deallocate the task and its bound references
+			WorkerThreadPool.wait_for_task_completion(task_id)
 			active_thread_tasks.remove_at(i)
 		i -= 1
 
-	# 3. Asynchronous Queue Guard:
-	# Confirm that the initial batch has finished compiling, across all cores
+	# Async Guard:
+	# Confirm that the initial batch has finished compiling...
 	if tracking_initial_gen and not initial_generation_cooked:
 		if job_queue.is_empty() and active_thread_tasks.is_empty():
 			initial_generation_cooked = true

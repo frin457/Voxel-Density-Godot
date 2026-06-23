@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://b4s5tiunt7gfn" path="res://scripts/world/world.gd" id="1_882fi"]
 [ext_resource type="PackedScene" uid="uid://co68l2ekwhii8" path="res://controller/unit/player.tscn" id="2_3h5nr"]
 [ext_resource type="Script" uid="uid://cchlfslsnl51m" path="res://scripts/chunk/chunkManager.gd" id="3_882fi"]
+[ext_resource type="Script" uid="uid://dqreyv0s206ht" path="res://scripts/controllers/tests/lodWaveController.gd" id="4_3h5nr"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_882fi"]
 shading_mode = 0
@@ -19,12 +20,16 @@ fov = 56.250004
 transform = Transform3D(0.19809014, -0.29259142, 0.9354949, 0.24563725, -0.9091339, -0.3363602, 0.94890606, 0.29642206, -0.10821915, 0, 12.778907, 1.6133575)
 
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("2_3h5nr")]
-transform = Transform3D(-1, 0, 8.742277e-08, 0, 0.99999994, 0, -8.742278e-08, 0, -0.99999994, 5, 10, -10)
+transform = Transform3D(-1, 0, 8.742277e-08, 0, 0.99999994, 0, -8.742278e-08, 0, -0.99999994, 5, 30, -10)
 up_direction = Vector3(0, 0, 1)
 
 [node name="ChunkManager" type="Node" parent="." unique_id=772524256]
 script = ExtResource("3_882fi")
 isDev = true
 chunk_size = 20
-dimensions = Vector3(256, 16, 256)
+dimensions = Vector3(128, 16, 128)
 chunk_material = SubResource("StandardMaterial3D_882fi")
+
+[node name="LodWave" type="Node" parent="ChunkManager" unique_id=1359254117 node_paths=PackedStringArray("chunk_manager")]
+script = ExtResource("4_3h5nr")
+chunk_manager = NodePath("..")

@@ -31,8 +31,9 @@ func flush() -> void:
 	lock.unlock()
 
 	# Sort operates solely on the main thread queue array
+	# Sorted ascending by wave index to guarantee linear visual propagation
 	queue.sort_custom(func(a, b):
-		return a.priority > b.priority
+		return a.sort_index < b.sort_index
 	)
 
 # ----------------------------
