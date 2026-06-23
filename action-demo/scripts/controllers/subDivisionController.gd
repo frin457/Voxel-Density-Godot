@@ -30,14 +30,10 @@ func request_merge(parent_coord: Vector3i) -> void:
 	if not is_instance_valid(parent_chunk):
 		return
 
-	# No child chunks, there's nothing to collapse
-	if parent_chunk.child_chunks.is_empty():
-		return
-		
 	print("Subdivision Controller: Collapsing 8 children of parent ", parent_coord)
 		
-	# 1. Clear out children chunk elements from the global registry
-	# Math match: Erase exact coordinate keys generated during split phase
+	# 1. Clear out children chunk elements from the global registry and scene tree
+	# Query global registry keys directly to catch unlinked/delayed thread orphans
 	for x in range(2):
 		for y in range(2):
 			for z in range(2):
@@ -47,16 +43,20 @@ func request_merge(parent_coord: Vector3i) -> void:
 					parent_coord.z * 2 + z
 				)
 				var child_key = manager.get_chunk_key(child_coord, 1)
-				manager.chunks.erase(child_key)
+				if manager.chunks.has(child_key):
+					var child_chunk = manager.chunks[child_key]
+					if is_instance_valid(child_chunk):
+						child_chunk.queue_free()
+					manager.chunks.erase(child_key)
 				
-	# Free memory from scene tree
+	# 2. Fallback sweep: Free any remaining structural node links inside the array
 	for child in parent_chunk.child_chunks:
 		if is_instance_valid(child):
 			child.queue_free()
 			
 	parent_chunk.child_chunks.clear()
 	
-	# 2. Restore the parent baseline
+	# 3. Restore the parent baseline
 	parent_chunk.activate()
 	
 	# FORCE THE MESH AND VISUAL ARRAYS TO BE RERENDERED IMMEDIATELY
@@ -100,7 +100,7 @@ func _execute_subdivision(parent_chunk: Chunk, chunk_coord: Vector3i, target_lev
 						{},
 						1.0,
 						target_level,
-						wave_index # Pass sorted wave priority
+						wave_index
 					)
 				)
 
