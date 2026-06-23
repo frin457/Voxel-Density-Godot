@@ -43,7 +43,7 @@ var tracking_initial_gen: bool = false
 var active_thread_tasks: Array[int] = []
 
 # Decoupled entry points for ANY external script
-signal subdivision_requested(coord: Vector3i, target_level: int)
+signal subdivision_requested(coord: Vector3i, target_level: int, wave_index: int)
 signal merge_requested(coord: Vector3i)
 signal generation_requested()
 signal generation_completed()

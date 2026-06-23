@@ -8,14 +8,14 @@ func _init(_manager: ChunkManager) -> void:
 
 
 ## Public Hook: Subdivides a specific chunk coordinate to an explicit depth level
-func request_subdivision(chunk_coord: Vector3i, target_level: int) -> void:
+func request_subdivision(chunk_coord: Vector3i, target_level: int, wave_index: int = 0) -> void:
 	var chunk = manager.query_controller.get_chunk(chunk_coord, target_level - 1)
 	
 	# Guard: If parent doesn't exist, or it's already at/beyond target LOD, cancel
 	if chunk == null or chunk.subdivision_level >= target_level:
 		return
 
-	_execute_subdivision(chunk, chunk_coord, target_level)
+	_execute_subdivision(chunk, chunk_coord, target_level, wave_index)
 
 
 ## Public Hook: Merges children back into a parent chunk
@@ -70,7 +70,7 @@ func request_merge(parent_coord: Vector3i) -> void:
 # ----------------------------
 # INTERNAL PROCESSING
 # ----------------------------
-func _execute_subdivision(parent_chunk: Chunk, chunk_coord: Vector3i, target_level: int) -> void:
+func _execute_subdivision(parent_chunk: Chunk, chunk_coord: Vector3i, target_level: int, wave_index: int = 0) -> void:
 	var base_world_pos = parent_chunk.position
 	var parent_world_size = manager.get_chunk_world_size() / pow(2, parent_chunk.subdivision_level)
 	var child_world_size = parent_world_size * 0.5
@@ -99,7 +99,8 @@ func _execute_subdivision(parent_chunk: Chunk, chunk_coord: Vector3i, target_lev
 						child_world_pos,
 						{},
 						1.0,
-						target_level
+						target_level,
+						wave_index # Pass sorted wave priority
 					)
 				)
 

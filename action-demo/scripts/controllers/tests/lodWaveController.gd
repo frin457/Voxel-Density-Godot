@@ -40,7 +40,7 @@ func _run_wave_demonstration() -> void:
 				target_wave_surface.append(surface_coord)
 
 	while true:
-		print("Wave Engine: ---> Dispatching Split Front (LOD 1) <---")
+		print("Wave Engine: ---> Dispatching Sorted Split Front (LOD 1) <---")
 		
 		# Process across our cached static column markers array
 		var current_x = -1
@@ -50,7 +50,8 @@ func _run_wave_demonstration() -> void:
 				await get_tree().create_timer(wave_speed).timeout
 			current_x = target_coord.x
 			
-			chunk_manager.subdivision_requested.emit(target_coord, 1)
+			# PASS THE X POSITION AS THE DETERMINISTIC SORT INDEX
+			chunk_manager.subdivision_requested.emit(target_coord, 1, current_x)
 			
 		# Final padding sweep delay for the last column array line
 		await get_tree().create_timer(wave_speed).timeout
