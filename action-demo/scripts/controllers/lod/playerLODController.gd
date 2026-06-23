@@ -1,77 +1,98 @@
 # ./scripts/controllers/playerLODController.gd
-class_name PlayerLODController extends Node 
+class_name PlayerLODController extends Node
 
-## If empty, automatically try find a parent ChunkManager.
-@export var manager: ChunkManager
+## If left empty, it will automatically try to find it if this node is a child of the ChunkManager.
+@onready var manager: ChunkManager = $ChunkManager
 
 var last_tracked_coord := Vector3i(999999, 999999, 999999)
+var requested_lod_map := {} 
+
+@export_group("Velocity Gating")
+@export var speed_threshold_lod2: float = 8.0
+@export var settle_duration: float = 0.4
+
+var last_player_position := Vector3.ZERO
+var current_speed := 0.0
+var settle_timer := 0.0
+
+const MAX_UPGRADES_PER_FRAME = 2
+const MAX_DOWNGRADES_PER_FRAME = 1
+const KEEP_NEIGHBORS_LOD1_LOADED = true
 
 func _ready() -> void:
-	# check heritage nodes for a ChunkManager.
 	if not manager:
 		manager = get_parent() as ChunkManager
 		if not manager and get_parent():
 			manager = get_parent().get_parent() as ChunkManager
 			
 	if not manager:
-		push_error("PlayerLODController Error: Could not find a ChunkManager! Please add ChunkManager.gd to a child node of the world.")
+		push_error("PlayerLODController Error: Cannot find ChunkManager!")
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not manager:
 		return
 		
-	# Tracks the camera viewport, currently being used
 	var camera = get_viewport().get_camera_3d()
-	if camera:
-		update_lod(camera) # Explicitly pass the camera for view culling
+	if not camera:
+		return
+		
+	var current_position = camera.global_position
+	if last_player_position != Vector3.ZERO and delta > 0.0:
+		current_speed = (current_position - last_player_position).length() / delta
+	else:
+		current_speed = 0.0
+	last_player_position = current_position
 
-## Hook for handling the grid logic and view culling
+	if current_speed < speed_threshold_lod2:
+		settle_timer += delta
+	else:
+		settle_timer = 0.0 
+
+	update_lod(camera)
+
 func update_lod(camera: Camera3D) -> void:
 	var player_position = camera.global_position
 	var chunk_world_size = manager.get_chunk_world_size()
 	
-	# 1. Determine player's current baseline LOD 0 chunk coordinate
 	var center_coord = Vector3i(
 		floor(player_position.x / chunk_world_size),
 		floor(player_position.y / chunk_world_size),
 		floor(player_position.z / chunk_world_size)
 	)
 	
-	# State machine actively audits chunks every frame
-	# to catch and clean up late-arriving async threads.
 	last_tracked_coord = center_coord
-	
-	# Get normalized forward direction vector of the camera
 	var camera_forward = -camera.global_transform.basis.z.normalized()
+	var is_allowed_lod2 = (current_speed < speed_threshold_lod2) and (settle_timer >= settle_duration)
 	
-	# 2. Define target states for our X by Z layout matrix around the player
 	var target_lod_map := {}
 	const rangeMin = -1
-	const rangeMax = 1
-	for x in range(rangeMin,rangeMax):
-		for z in range(rangeMin,rangeMax):
-			for y in range(-1,1): # Vertical cushion layer
+	const rangeMax = 2 
+	for x in range(rangeMin, rangeMax):
+		for z in range(rangeMin, rangeMax):
+			for y in range(rangeMin, rangeMax): 
 				var offset_coord = center_coord + Vector3i(x, y, z)
 				
 				if x == 0 and y == 0 and z == 0:
-					target_lod_map[offset_coord] = 2 #  chunk resolution increases 2 steps (LOD 2)
+					target_lod_map[offset_coord] = 2 if is_allowed_lod2 else 1
 				else:
-					# Surrounding chunks go up 1 step (LOD 1) when within view of the camera
 					if not target_lod_map.has(offset_coord):
-						# Calculate the absolute world center position of this surrounding chunk
-						var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
-						var dir_to_chunk = (chunk_center_world - player_position).normalized()
-						
-						# Cone Visibility Check via Dot Product:
-						# 1.0 = centered, 0.0 = perpendicular. 0.4 creates a  ~132° peripheral view cone.
-						var is_in_view = camera_forward.dot(dir_to_chunk) > 0.4
-						
-						if is_in_view:
-							target_lod_map[offset_coord] = 1 # Directly in front of camera -> Keep detailed
+						if KEEP_NEIGHBORS_LOD1_LOADED:
+							target_lod_map[offset_coord] = 1
 						else:
-							target_lod_map[offset_coord] = 0 # Behind camera -> Drop to LOD 0
+							var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
+							var dir_to_chunk = (chunk_center_world - player_position).normalized()
+							var dot_product = camera_forward.dot(dir_to_chunk)
+							
+							if dot_product > 0.4:
+								target_lod_map[offset_coord] = 1 
+							elif dot_product < 0.1:
+								target_lod_map[offset_coord] = 0
+							else:
+								target_lod_map[offset_coord] = requested_lod_map.get(offset_coord, 0)
 
-	# 3. Evaluate every base chunk currently registered in the manager
+	var upgrades_dispatched = 0
+	var downgrades_dispatched = 0
+
 	var chunk_keys = manager.chunks.keys()
 	for key in chunk_keys:
 		if not "_LOD0" in key:
@@ -90,25 +111,45 @@ func update_lod(camera: Camera3D) -> void:
 		var desired_lod = target_lod_map.get(chunk_coord, 0)
 		
 		var current_lod = 0
-		if base_chunk.child_chunks.size() == 8:
+		if base_chunk.child_chunks.size() > 0: # Robust check: if any child chunks exist, it's modified
 			current_lod = 1
-			var first_child = base_chunk.child_chunks[0]
-			if is_instance_valid(first_child) and first_child.child_chunks.size() == 8:
-				current_lod = 2
+			# Inspect real inner status to check if it has deep subdivisions
+			for child in base_chunk.child_chunks:
+				if is_instance_valid(child) and child.child_chunks.size() > 0:
+					current_lod = 2
+					break
 
-		# 4. State Machine Transition Execution
 		if desired_lod == current_lod:
+			if requested_lod_map.get(chunk_coord, -1) == current_lod:
+				requested_lod_map.erase(chunk_coord)
 			continue
 			
+		if requested_lod_map.get(chunk_coord, -1) == desired_lod:
+			continue
+			
+		if chunk_coord != center_coord:
+			if desired_lod > current_lod:
+				if upgrades_dispatched >= MAX_UPGRADES_PER_FRAME:
+					continue
+			else:
+				if downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME:
+					continue
+
 		if desired_lod > current_lod:
 			_upgrade_chunk_lod(chunk_coord, current_lod, desired_lod)
+			upgrades_dispatched += 1
 		else:
 			_downgrade_chunk_lod(chunk_coord, current_lod, desired_lod)
+			downgrades_dispatched += 1
+			
+		requested_lod_map[chunk_coord] = desired_lod
 
 
 func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
+	# OPTIMIZATION: Only generate LOD 1 if the baseline space actually contains surfaces
 	if from_lod == 0 and to_lod >= 1:
-		manager.subdivision_controller.request_subdivision(coord, 1)
+		if _chunk_contains_surfaces(coord, 1):
+			manager.subdivision_controller.request_subdivision(coord, 1)
 		
 	if to_lod == 2:
 		for x in range(2):
@@ -119,14 +160,15 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 						coord.y * 2 + y,
 						coord.z * 2 + z
 					)
-					manager.subdivision_controller.request_subdivision(child_coord, 2)
+					# CRITICAL OPTIMIZATION: Check surface data map before spinning up worker thread tasks
+					if _chunk_contains_surfaces(child_coord, 2):
+						manager.subdivision_controller.request_subdivision(child_coord, 2)
 
 
 func _downgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
-	if to_lod == 0:
-		manager.subdivision_controller.request_merge(coord, 0)
-		
-	elif to_lod == 1 and from_lod == 2:
+	# Safe cleanup: merging checks all 8 coordinate variants.
+	# The subdivision_controller should handle empty coordinates elegantly without breaking.
+	if from_lod == 2 and to_lod <= 1:
 		for x in range(2):
 			for y in range(2):
 				for z in range(2):
@@ -136,3 +178,20 @@ func _downgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 						coord.z * 2 + z
 					)
 					manager.subdivision_controller.request_merge(child_coord, 1)
+		
+	if to_lod == 0:
+		manager.subdivision_controller.request_merge(coord, 0)
+
+
+## SURFACE AUDIT FILTER
+## Hook this directly into your structural generation data (Noise matrices, Voxel data, or Room maps)
+func _chunk_contains_surfaces(coord: Vector3i, target_lod: int) -> bool:
+	# Example implementation logic:
+	# 1. Calculate the spatial bounding box of this specific coordinate at the current LOD scale.
+	# 2. Check your terrain noise generator or map array.
+	# 3. If the region is completely full (solid stone) or completely 0 (empty air), return false.
+	# 4. If it contains data variance (crosses your noise isosurface / contains props), return true.
+	
+	# For this reference file template, we return true to preserve default behavior, 
+	# but plugging your noise/bounds array check here drops thread loads dramatically.
+	return true
