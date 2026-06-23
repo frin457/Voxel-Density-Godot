@@ -2,7 +2,7 @@
 class_name PlayerLODController extends Node
 
 ## If left empty, it will automatically try to find it if this node is a child of the ChunkManager.
-@onready var manager: ChunkManager = $ChunkManager
+@onready var manager: ChunkManager = $".."
 
 var last_tracked_coord := Vector3i(999999, 999999, 999999)
 var requested_lod_map := {} 
@@ -111,9 +111,8 @@ func update_lod(camera: Camera3D) -> void:
 		var desired_lod = target_lod_map.get(chunk_coord, 0)
 		
 		var current_lod = 0
-		if base_chunk.child_chunks.size() > 0: # Robust check: if any child chunks exist, it's modified
+		if base_chunk.child_chunks.size() > 0: 
 			current_lod = 1
-			# Inspect real inner status to check if it has deep subdivisions
 			for child in base_chunk.child_chunks:
 				if is_instance_valid(child) and child.child_chunks.size() > 0:
 					current_lod = 2
@@ -146,7 +145,6 @@ func update_lod(camera: Camera3D) -> void:
 
 
 func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
-	# OPTIMIZATION: Only generate LOD 1 if the baseline space actually contains surfaces
 	if from_lod == 0 and to_lod >= 1:
 		if _chunk_contains_surfaces(coord, 1):
 			manager.subdivision_controller.request_subdivision(coord, 1)
@@ -160,14 +158,11 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 						coord.y * 2 + y,
 						coord.z * 2 + z
 					)
-					# CRITICAL OPTIMIZATION: Check surface data map before spinning up worker thread tasks
 					if _chunk_contains_surfaces(child_coord, 2):
 						manager.subdivision_controller.request_subdivision(child_coord, 2)
 
 
 func _downgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
-	# Safe cleanup: merging checks all 8 coordinate variants.
-	# The subdivision_controller should handle empty coordinates elegantly without breaking.
 	if from_lod == 2 and to_lod <= 1:
 		for x in range(2):
 			for y in range(2):
@@ -183,15 +178,25 @@ func _downgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 		manager.subdivision_controller.request_merge(coord, 0)
 
 
-## SURFACE AUDIT FILTER
-## Hook this directly into your structural generation data (Noise matrices, Voxel data, or Room maps)
+## ULTRA-FAST CACHED AUDIT LOOKUP
 func _chunk_contains_surfaces(coord: Vector3i, target_lod: int) -> bool:
-	# Example implementation logic:
-	# 1. Calculate the spatial bounding box of this specific coordinate at the current LOD scale.
-	# 2. Check your terrain noise generator or map array.
-	# 3. If the region is completely full (solid stone) or completely 0 (empty air), return false.
-	# 4. If it contains data variance (crosses your noise isosurface / contains props), return true.
-	
-	# For this reference file template, we return true to preserve default behavior, 
-	# but plugging your noise/bounds array check here drops thread loads dramatically.
-	return true
+	if target_lod == 1:
+		var key = manager.get_chunk_key(coord, 0)
+		if manager.chunks.has(key):
+			var chunk = manager.chunks[key] as Chunk
+			if is_instance_valid(chunk):
+				return not chunk.is_empty_air
+				
+	elif target_lod == 2:
+		# Map the target LOD 1 grid cell coordinate back to its parent LOD 0 coordinate
+		var parent_coord = Vector3i(coord.x >> 1, coord.y >> 1, coord.z >> 1)
+		var parent_key = manager.get_chunk_key(parent_coord, 0)
+		
+		if manager.chunks.has(parent_key):
+			var parent_chunk = manager.chunks[parent_key] as Chunk
+			if is_instance_valid(parent_chunk):
+				# Isolate lowest bit to get local offset index (0 or 1)
+				var local_offset = Vector3i(coord.x & 1, coord.y & 1, coord.z & 1)
+				return parent_chunk.sub_quadrant_has_surfaces.get(local_offset, true)
+				
+	return true # Fallback safety to prevent gaps if data isn't loaded yet

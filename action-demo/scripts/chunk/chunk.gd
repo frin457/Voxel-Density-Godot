@@ -15,6 +15,20 @@ var active := true
 var subdivision_level: int = 0
 
 # ==================================================
+# PERFORMANCE & SURFACE CACHING
+# ==================================================
+## True if this chunk contains absolutely zero voxel data (pure air)
+var is_empty_air := true
+
+## Pre-calculated flags tracking which of the 8 potential high-LOD sub-quadrants contain voxels
+var sub_quadrant_has_surfaces := {
+	Vector3i(0,0,0): false, Vector3i(1,0,0): false,
+	Vector3i(0,1,0): false, Vector3i(1,1,0): false,
+	Vector3i(0,0,1): false, Vector3i(1,0,1): false,
+	Vector3i(0,1,1): false, Vector3i(1,1,1): false
+}
+
+# ==================================================
 # VOXEL STATE
 # ==================================================
 # Original terrain definition. Never modified.
@@ -35,11 +49,6 @@ var visual_bounds_mesh: MeshInstance3D = null # Holds wireframe reference
 var mesh_dirty := false
 var collision_dirty := false
 
-
-#func _ready() -> void:
-	## Avoid overwriting an already generated/assigned mesh
-	#if meshInstance and meshInstance.mesh == null:
-		#meshInstance.mesh = ArrayMesh.new()
 
 func _ready() -> void:
 	# CRITICAL FIX: Explicitly assign a unique ArrayMesh instance 
@@ -78,6 +87,7 @@ func set_voxel_data(data: Dictionary) -> void:
 		original_voxels[pos] = backup
 		voxels[pos] = live
 		
+	_update_surface_cache()
 	mark_dirty()
 
 
@@ -114,6 +124,7 @@ func activate() -> void:
 # ==================================================
 func destroy_voxel(position) -> void:
 	voxels.erase(position)
+	_update_surface_cache()
 	mark_dirty()
 
 
@@ -123,6 +134,7 @@ func destroy_voxel(position) -> void:
 func restore_voxel(position) -> void:
 	if original_voxels.has(position):
 		voxels[position] = original_voxels[position]
+		_update_surface_cache()
 		mark_dirty()
 
 
@@ -132,3 +144,29 @@ func restore_all() -> void:
 
 func begin_regeneration() -> void:
 	pass
+
+
+# ==================================================
+# INTERNAL CACHE PROCESSING
+# ==================================================
+func _update_surface_cache() -> void:
+	is_empty_air = voxels.is_empty()
+	
+	# Clear previous sub-quadrant calculations
+	for k in sub_quadrant_has_surfaces.keys():
+		sub_quadrant_has_surfaces[k] = false
+		
+	if is_empty_air:
+		return
+		
+	# Determine the center splitting boundary line of the voxel grid dimensions
+	var half_size : float
+	if is_inside_tree() and get_parent() is ChunkManager:
+		half_size = get_parent().chunk_size / 2
+
+	# Evaluate which sub-quadrants contain physical surfaces
+	for pos in voxels:
+		var q_x = 1 if pos.x >= half_size else 0
+		var q_y = 1 if pos.y >= half_size else 0
+		var q_z = 1 if pos.z >= half_size else 0
+		sub_quadrant_has_surfaces[Vector3i(q_x, q_y, q_z)] = true

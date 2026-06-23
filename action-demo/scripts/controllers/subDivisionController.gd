@@ -2,26 +2,57 @@
 class_name SubdivisionController extends RefCounted
 
 var manager: ChunkManager
+# Prevent duplicate requests while jobs are still processing.
+var pending_subdivisions := {}
+var pending_merges := {}
 
 func _init(_manager: ChunkManager) -> void:
 	manager = _manager
 
 
 ## Public Hook: Subdivides a specific chunk coordinate to an explicit depth level
-func request_subdivision(chunk_coord: Vector3i, target_level: int, wave_index: int = 0) -> void:
-	var chunk = manager.query_controller.get_chunk(chunk_coord, target_level - 1)
-	
-	# Guard: If parent doesn't exist, or it's already at/beyond target LOD, cancel
-	if chunk == null or chunk.subdivision_level >= target_level:
+func request_subdivision(
+	chunk_coord: Vector3i,
+	target_level: int,
+	wave_index: int = 0
+) -> void:
+
+	var request_key = "%s_%d" % [chunk_coord, target_level]
+
+	if pending_subdivisions.has(request_key):
 		return
 
-	_execute_subdivision(chunk, chunk_coord, target_level, wave_index)
+	var chunk = manager.query_controller.get_chunk(
+		chunk_coord,
+		target_level - 1
+	)
+
+	if chunk == null:
+		return
+
+	if chunk.subdivision_level >= target_level:
+		return
+
+	pending_subdivisions[request_key] = true
+
+	_execute_subdivision(
+		chunk,
+		chunk_coord,
+		target_level,
+		wave_index
+	)
 
 
 #./scripts/controllers/subDivisionController.gd
 
 ## Public Hook: Merges children back into a parent chunk at an arbitrary LOD level
 func request_merge(parent_coord: Vector3i, parent_lod: int = 0) -> void:
+	var merge_key = "%s_%d" % [parent_coord, parent_lod]
+
+	if pending_merges.has(merge_key):
+		return
+
+	pending_merges[merge_key] = true
 	var parent_key = manager.get_chunk_key(parent_coord, parent_lod)
 	
 	if not manager.chunks.has(parent_key):
@@ -72,6 +103,7 @@ func request_merge(parent_coord: Vector3i, parent_lod: int = 0) -> void:
 		parent_chunk.mesh_dirty = true
 		
 	manager.process_chunk(parent_chunk)
+	pending_merges.erase(merge_key)
 
 
 # ----------------------------
@@ -110,6 +142,8 @@ func _execute_subdivision(parent_chunk: Chunk, chunk_coord: Vector3i, target_lev
 						wave_index
 					)
 				)
+	var request_key = "%s_%d" % [chunk_coord, target_level]
+	pending_subdivisions.erase(request_key)
 
 
 func debug_force_subdivide_center() -> void:
