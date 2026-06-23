@@ -211,6 +211,7 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	chunk.position = job.world_position
 	chunk.voxel_size = local_voxel_scale
 	chunk.subdivision_level = job.lod_level
+	chunk.chunk_coordinate = job.chunk_coordinate	
 	chunk.mat = chunk_material
 
 	add_child(chunk)
