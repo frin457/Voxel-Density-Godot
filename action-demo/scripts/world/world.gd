@@ -22,8 +22,8 @@ func _ready() -> void:
 		return
 	
 	# runs first to begin listening to the generation signals
-	if isDev:
-		_run_development_test()
+	#if isDev:
+		#_run_development_test()
 		
 	# start world generation
 	chunk_manager.generation_requested.emit.call_deferred()

@@ -19,23 +19,53 @@ func request_subdivision(chunk_coord: Vector3i, target_level: int) -> void:
 
 
 ## Public Hook: Merges children back into a parent chunk
-func request_merge(chunk_coord: Vector3i, parent_lod: int) -> void:
-	var chunk = manager.query_controller.get_chunk(chunk_coord, parent_lod)
-	if chunk == null or chunk.child_chunks.is_empty():
+## Collapses 8 LOD 1 children back into their original baseline LOD 0 parent
+func request_merge(parent_coord: Vector3i) -> void:
+	var parent_key = manager.get_chunk_key(parent_coord, 0)
+	
+	if not manager.chunks.has(parent_key):
+		return
+		
+	var parent_chunk: Chunk = manager.chunks[parent_key]
+	if not is_instance_valid(parent_chunk):
 		return
 
-	# Reactivate parent mesh visibility
-	chunk.activate()
-
-	# Clear out the sub-children entries from the state system
-	for child in chunk.child_chunks:
+	# No child chunks, there's nothing to collapse
+	if parent_chunk.child_chunks.is_empty():
+		return
+		
+	print("Subdivision Controller: Collapsing 8 children of parent ", parent_coord)
+		
+	# 1. Clear out children chunk elements from the global registry
+	# Math match: Erase exact coordinate keys generated during split phase
+	for x in range(2):
+		for y in range(2):
+			for z in range(2):
+				var child_coord = Vector3i(
+					parent_coord.x * 2 + x,
+					parent_coord.y * 2 + y,
+					parent_coord.z * 2 + z
+				)
+				var child_key = manager.get_chunk_key(child_coord, 1)
+				manager.chunks.erase(child_key)
+				
+	# Free memory from scene tree
+	for child in parent_chunk.child_chunks:
 		if is_instance_valid(child):
-			var child_key = manager.get_chunk_key(child.chunk_coordinate, child.subdivision_level)
-			manager.chunks.erase(child_key)
 			child.queue_free()
 			
-	chunk.child_chunks.clear()
-
+	parent_chunk.child_chunks.clear()
+	
+	# 2. Restore the parent baseline
+	parent_chunk.activate()
+	
+	# FORCE THE MESH AND VISUAL ARRAYS TO BE RERENDERED IMMEDIATELY
+	if parent_chunk.has_method("set_mesh_dirty"):
+		parent_chunk.set_mesh_dirty(true)
+	else:
+		parent_chunk.mesh_dirty = true
+		
+	manager.process_chunk(parent_chunk)
 
 # ----------------------------
 # INTERNAL PROCESSING
@@ -72,6 +102,7 @@ func _execute_subdivision(parent_chunk: Chunk, chunk_coord: Vector3i, target_lev
 						target_level
 					)
 				)
+
 
 func debug_force_subdivide_center() -> void:
 	var center := Vector3i(0, 0, 0)

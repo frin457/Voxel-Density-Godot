@@ -44,8 +44,10 @@ var active_thread_tasks: Array[int] = []
 
 # Decoupled entry points for ANY external script
 signal subdivision_requested(coord: Vector3i, target_level: int)
+signal merge_requested(coord: Vector3i)
 signal generation_requested()
 signal generation_completed()
+
 
 var random := FastNoiseLite.new()
 var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
@@ -67,6 +69,7 @@ func _ready() -> void:
 	
 	# Connect signals directly to controller methods to bypass lambda execution delays
 	subdivision_requested.connect(subdivision_controller.request_subdivision)
+	merge_requested.connect(subdivision_controller.request_merge)
 	generation_requested.connect(start_world_generation)
 
 
