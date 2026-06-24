@@ -1,60 +1,70 @@
 # ./scripts/controllers/chunkMeshController.gd
 class_name ChunkMeshController extends RefCounted
 
-# Tracks chunks currently undergoing background meshing tasks to prevent duplicate threads
+# Tracks chunks currently undergoing background meshing tasks
 var active_mesh_tasks := {}
+# Tracks the structural modification version of a chunk to discard stale threads
+var chunk_generations := {}
 
 ## Entry point called by ChunkManager
 func rebuild(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
 		return
 		
-	# If this chunk is already being meshed on a thread, do not spin up another one
-	if active_mesh_tasks.has(chunk):
-		return
+	# Prune any deleted chunk references from tracking to prevent memory bloat
+	_prune_invalid_references()
 
-	# CRITICAL FOR THREAD SAFETY: Dictionaries are not thread-safe in Godot 4 if modified
-	# during iteration. We duplicate the live voxel dictionary instantly on the main thread 
-	# to act as an immutable snapshot for our worker thread.
+	# Increment the generation ID for this specific chunk.
+	# Any background thread currently running for this chunk will now carry an outdated ID
+	# and will be safely ignored when it returns.
+	var current_generation = chunk_generations.get(chunk, 0) + 1
+	chunk_generations[chunk] = current_generation
+
+	# Snapshot live properties instantly on the main thread
 	var voxel_snapshot := chunk.voxels.duplicate()
 	var chunk_size := chunk.chunk_size
 	var voxel_size := chunk.voxel_size
 	var mesh_instance := chunk.meshInstance
 	var material := chunk.mat
 
-	# Dispatch surface extraction to a background thread
+	
+	if active_mesh_tasks.has(chunk):
+		var existing_task = active_mesh_tasks[chunk]
+
+		if not WorkerThreadPool.is_task_completed(existing_task):
+			return
+			
 	var task_id = WorkerThreadPool.add_task(
-		_async_extract_surface.bind(chunk, voxel_snapshot, chunk_size, voxel_size, mesh_instance, material),
+		_async_extract_surface.bind(chunk, voxel_snapshot, chunk_size, voxel_size, mesh_instance, material, current_generation),
 		true,
 		"MeshExtract_%X" % chunk.get_instance_id()
 	)
+	
 	active_mesh_tasks[chunk] = task_id
 
 
 ## Executed entirely on a BACKGROUND WORKER THREAD
 func _async_extract_surface(
-	chunk: Chunk, 
+	chunk: Object, 
 	voxels: Dictionary, 
 	size: int, 
 	scale: float, 
-	mesh_instance: MeshInstance3D, 
-	material: Material
+	mesh_instance: Object, 
+	material: Material,
+	generation: int
 ) -> void:
 	
 	# -------------------------------------------------------------
-	# PLACE YOUR SURFACE EXTRACTION LOOPS HERE (Marching Cubes, Greedy Meshing, etc.)
+	# SURFACE EXTRACTION LOOPS (Marching Cubes, Greedy Meshing, etc.)
 	# -------------------------------------------------------------
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 
-	# --- Example Loop Structure Placeholder ---
-	# For demonstration purposes. Replace this loop with your actual voxel iteration 
-	# and face building logic using the 'voxels', 'size', and 'scale' passed parameters.
 	for pos in voxels:
 		var voxel = voxels[pos]
-		# Build your faces, vertices, indices, normals, and colors here...
+		# Build geometry components here...
 		pass
 	# -------------------------------------------------------------
 
@@ -68,47 +78,65 @@ func _async_extract_surface(
 		surface_arrays[Mesh.ARRAY_NORMAL] = normals
 		surface_arrays[Mesh.ARRAY_COLOR] = colors
 
-	# Safely hand off the extracted vertex arrays back to the main thread for rendering
-	_main_thread_commit_mesh.call_deferred(chunk, surface_arrays, mesh_instance, material)
+	# Safely hand off arrays and our generation ID back to the main thread
+	# Note: We pass standard Objects down to bypass thread-boundary type strictness drops
+	_main_thread_commit_mesh.call_deferred(chunk, surface_arrays, mesh_instance, material, generation)
 
 
-## Executed back on the MAIN THREAD (Scene-tree safe operations)
+## Executed back on the MAIN THREAD
 func _main_thread_commit_mesh(
-	chunk: Chunk, 
+	chunk_obj: Object, 
 	surface_arrays: Array, 
-	mesh_instance: MeshInstance3D, 
-	material: Material
+	mesh_instance_obj: Object, 
+	material: Material,
+	generation: int
 ) -> void:
 	
-	# Clean up tracking immediately
-	active_mesh_tasks.erase(chunk)
-
-	# Safety check in case the chunk was freed/cleared while threading was active
-	if not is_instance_valid(chunk) or not is_instance_valid(mesh_instance):
+	if not is_instance_valid(chunk_obj): return
+	var actual_chunk = chunk_obj as Chunk
+	
+	# --- THREAD GENERATION GUARD ---
+	# If a newer request was made while this thread was processing, this data is stale.
+	# Return early without touching the mesh or clearing flags.
+	if generation != chunk_generations.get(actual_chunk, -1):
+		active_mesh_tasks.erase(actual_chunk)
 		return
 
-	var array_mesh = mesh_instance.mesh as ArrayMesh
-	if not array_mesh:
-		array_mesh = ArrayMesh.new()
-		mesh_instance.mesh = array_mesh
+	if not is_instance_valid(mesh_instance_obj): return
+	var actual_mesh_instance = mesh_instance_obj as MeshInstance3D
 
-	# Clear previous geometry surfaces
-	while array_mesh.get_surface_count() > 0:
-		array_mesh.remove_surface(0)
-
-	# Commit new geometry if valid surfaces were built
-	if surface_arrays[Mesh.ARRAY_VERTEX] != null and surface_arrays[Mesh.ARRAY_VERTEX].size() > 0:
-		array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
-		mesh_instance.set_surface_override_material(0, material)
-
-	# Tell the chunk its mesh is clean.
-	chunk.mesh_dirty = false
+	# Create a NEW mesh resource instead of clearing the old one.
+	# This keeps the old mesh visible until the new one is fully baked.
+	var new_mesh = ArrayMesh.new()
 	
-	# Evaluate if both rendering and physics are ready to release the block
-	_evaluate_chunk_readiness(chunk)
+	if surface_arrays[Mesh.ARRAY_VERTEX] != null and surface_arrays[Mesh.ARRAY_VERTEX].size() > 0:
+		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
+		actual_mesh_instance.set_surface_override_material(0, material)
+
+	# Swap the reference instantly. This is a single pointer change.
+	# No more flickering from removing/adding surfaces!
+	actual_mesh_instance.mesh = new_mesh
+	active_mesh_tasks.erase(actual_chunk)
+	actual_chunk.mesh_dirty = false
+
+	# TODO: Temporary until CollisionController exists.
+	actual_chunk.collision_dirty = false
+	_evaluate_chunk_readiness(actual_chunk)
 
 
 func _evaluate_chunk_readiness(chunk: Chunk) -> void:
-	# Only mark the chunk as fully cleared once BOTH physics and mesh generation threads finish
-	if not chunk.mesh_dirty and not chunk.collision_dirty:
-		chunk.clear_dirty()
+	if not is_instance_valid(chunk):
+		return
+
+	chunk.evaluate_ready()
+
+	var manager = chunk.get_parent()
+	if manager and manager.subdivision_controller:
+		manager.subdivision_controller.notify_chunk_mesh_ready(chunk)
+
+
+func _prune_invalid_references() -> void:
+	for c in active_mesh_tasks.keys():
+		if not is_instance_valid(c):
+			active_mesh_tasks.erase(c)
+			chunk_generations.erase(c)
