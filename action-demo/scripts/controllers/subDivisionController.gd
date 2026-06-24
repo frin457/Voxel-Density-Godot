@@ -54,9 +54,16 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 func subdivision_complete(parent_coord: Vector3i, lod: int) -> void:
 	var parent_key = manager.get_chunk_key(parent_coord, lod - 1)
 	pending_subdivisions.erase(parent_key)
+	
 	if manager.chunks.has(parent_key):
 		var parent_chunk = manager.chunks[parent_key]
 		parent_chunk.current_lod = lod
+		
+		# Explicit Handoff: Ensure ALL children are active before hiding parent
+		for child in parent_chunk.child_chunks:
+			if is_instance_valid(child) and child.has_method("activate"):
+				child.activate()
+				
 		parent_chunk.deactivate()
 
 

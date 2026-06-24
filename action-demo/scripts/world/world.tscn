@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://cchlfslsnl51m" path="res://scripts/chunk/chunkManager.gd" id="3_882fi"]
 [ext_resource type="Script" uid="uid://c88apb3ttnttf" path="res://scripts/controllers/lod/playerLODController.gd" id="4_3h5nr"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_882fi"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3h5nr"]
 shading_mode = 0
 vertex_color_use_as_albedo = true
 
@@ -26,8 +26,8 @@ up_direction = Vector3(0, 0, 1)
 [node name="ChunkManager" type="Node" parent="." unique_id=772524256]
 script = ExtResource("3_882fi")
 isDev = true
-dimensions = Vector3(128, 8, 128)
-chunk_material = SubResource("StandardMaterial3D_882fi")
+dimensions = Vector3(128, 16, 128)
+chunk_material = SubResource("StandardMaterial3D_3h5nr")
 
 [node name="Lod" type="Node" parent="ChunkManager" unique_id=1359254117]
 script = ExtResource("4_3h5nr")

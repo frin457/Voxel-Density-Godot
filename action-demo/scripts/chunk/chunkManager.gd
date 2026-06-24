@@ -13,7 +13,6 @@ class_name ChunkManager extends Node
 # Global Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
-var collision_controller := CollisionController.new()
 
 # Controllers initialized in _ready()
 var subdivision_controller: SubdivisionController
@@ -235,8 +234,12 @@ func process_chunk(chunk: Chunk) -> void:
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
 
-	if chunk.collision_dirty:
-		collision_controller.rebuild(chunk)
+	# Tell the subdivision controller this specific chunk is built and ready
+		if subdivision_controller and subdivision_controller.has_method("notify_chunk_mesh_ready"):
+			subdivision_controller.notify_chunk_mesh_ready(chunk)
+			
+	#if chunk.collision_dirty:
+		#collision_controller.rebuild(chunk)
 		
 # ----------------------------
 # BACKGROUND THREAD EXECUTION BLOCK

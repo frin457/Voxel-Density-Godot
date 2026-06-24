@@ -34,16 +34,19 @@ func generate_data(
 			var adjusted = pow(normalized, terrainExponent)
 			var terrain_height = max_world_height * adjusted
 
-			for y in range(chunk_resolution):
+			var vertical_resolution = int(
+				chunk_resolution * pow(2, lod_level)
+			)
+
+			for y in range(vertical_resolution):
 				var world_y = chunk_position.y + (float(y) * voxel_size)
 
-				# FIX: To fix the underside gap without shifting dictionary indices,
-				# we ensure voxels are generated right up to the line, allowing a tiny
+				# Ensure voxels are generated right up to the line, allowing a tiny
 				# fractional overlap buffer if world_y is extremely close to the height boundary.
 				if world_y > (terrain_height + (voxel_size * 0.1)):
 					break
 
-				var color_index = int(floor(world_y))
+				var color_index = int(floor(world_y / voxel_size))
 				if color_index < 0:
 					color_index = abs(color_index)
 
