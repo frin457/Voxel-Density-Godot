@@ -188,18 +188,25 @@ func _process(_delta: float) -> void:
 func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	var coord = job.chunk_coordinate
 	
-	# --- GENERALIZED AUTHORIZATION DEPTH CHECK (LOD 3+) ---
-	# Dynamically scale coordinate up by bitshifting matching the job's level depth
+	# 1. DYNAMIC AUTHORIZATION DEPTH CHECK
 	var base_coord = coord
 	if job.lod_level > 0:
+		# Bitshift back to find the root LOD 0 column coordinate
 		base_coord = Vector3i(coord.x >> job.lod_level, coord.y >> job.lod_level, coord.z >> job.lod_level)
 		
-	if job.lod_level > authorized_lod_levels.get(base_coord, 0):
+	# FETCH CURRENT LIVE AUTHORIZATION LEVEL
+	var current_authorized_lod = authorized_lod_levels.get(base_coord, 0)
+	
+	# CRITICAL GUARD: If the player has already moved away and changed the authorized LOD level,
+	# or if this is a stale thread from an old LOD level configuration, discard it!
+	if job.lod_level != current_authorized_lod:
 		if isDev:
-			print("Voxel Engine: Discarded stale chunk generation at ", coord, " LOD ", job.lod_level)
+			print("Voxel Engine Thread Guard: Discarded STALE ghost thread at ", coord, " (Job LOD: ", job.lod_level, " | Current Live Authorized LOD: ", current_authorized_lod, ")")
 		return
 
 	var key = get_chunk_key(coord, job.lod_level)
+	
+	# 2. DUPLICATE GUARD: If a valid live chunk already exists here, don't overwrite it
 	if chunks.has(key) and is_instance_valid(chunks[key]):
 		return
 

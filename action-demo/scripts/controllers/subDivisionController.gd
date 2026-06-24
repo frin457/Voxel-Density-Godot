@@ -69,14 +69,18 @@ func subdivision_complete(parent_coord: Vector3i, lod: int) -> void:
 
 func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 	var parent_key = manager.get_chunk_key(parent_coord, parent_level)
-	# Clean Action Guard: Stop duplicate concurrent executions on the same chunk
 	if pending_merges.has(parent_key):
 		return
-	
 	pending_merges[parent_key] = true
-	
+
 	if manager.chunks.has(parent_key):
 		var parent_chunk = manager.chunks[parent_key]
+
+		# Clean out previous lod tracking keys, so that a chunk can scale up more than once
+		# If we are merging back to LOD 0, we need to clear the pending key for LOD 0 -> 1
+		var sub_key = manager.get_chunk_key(parent_coord, parent_level)
+		if pending_subdivisions.has(sub_key):
+			pending_subdivisions.erase(sub_key)
 
 		_clean_child_geometry(parent_chunk)
 
@@ -93,6 +97,7 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 		if not is_instance_valid(child):
 			continue
 
+		# 1. Recursively clear out grandchildren (LOD 2+)
 		_clean_child_geometry(child)
 
 		child.parent_chunk = null
@@ -102,10 +107,18 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 			child.lod_level
 		)
 
+		# Clear out pending state gates for this child chunk.
+		# ensures that if  chunk has been a parent for a higher LOD,
+		# it is fully available for subsequent triggers.
+		if pending_subdivisions.has(child_key):
+			pending_subdivisions.erase(child_key)
+			
+		if pending_merges.has(child_key):
+			pending_merges.erase(child_key)
+
+		# 2. remove child from engine registry
 		manager.chunks.erase(child_key)
-
 		parent_chunk.child_chunks.erase(child)
-
 		child.queue_free()
 
 	parent_chunk.child_chunks.clear()

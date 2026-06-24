@@ -50,13 +50,11 @@ func _exit_tree() -> void:
 
 func mark_dirty() -> void:
 	var already_dirty = mesh_dirty or collision_dirty
-
+	if already_dirty:
+			return
 	mesh_dirty = true
 	collision_dirty = true
 	is_mesh_ready = false
-
-	if already_dirty:
-		return
 
 	var manager = get_parent()
 	if manager and manager.has_method("queue_dirty_chunk"):
