@@ -52,6 +52,7 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 
 
 func subdivision_complete(parent_coord: Vector3i, lod: int) -> void:
+	# Explicitly verify the key string matches the exact level configuration
 	var parent_key = manager.get_chunk_key(parent_coord, lod - 1)
 	pending_subdivisions.erase(parent_key)
 	
@@ -59,7 +60,6 @@ func subdivision_complete(parent_coord: Vector3i, lod: int) -> void:
 		var parent_chunk = manager.chunks[parent_key]
 		parent_chunk.current_lod = lod
 		
-		# Explicit Handoff: Ensure ALL children are active before hiding parent
 		for child in parent_chunk.child_chunks:
 			if is_instance_valid(child) and child.has_method("activate"):
 				child.activate()
@@ -76,12 +76,19 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 	if manager.chunks.has(parent_key):
 		var parent_chunk = manager.chunks[parent_key]
 
-		# Clean out previous lod tracking keys, so that a chunk can scale up more than once
-		# If we are merging back to LOD 0, we need to clear the pending key for LOD 0 -> 1
-		var sub_key = manager.get_chunk_key(parent_coord, parent_level)
-		if pending_subdivisions.has(sub_key):
-			pending_subdivisions.erase(sub_key)
+		# 1. Clear for root level (e.g., LOD 0)
+		var current_level_key = manager.get_chunk_key(parent_coord, parent_level)
+		if pending_subdivisions.has(current_level_key):
+			pending_subdivisions.erase(current_level_key)
 
+		# 2. CRITICAL GRID FIX: Clear the gate for the level right above it (e.g., LOD 1)
+		# This ensures that any historic or dropped LOD 1 -> LOD 2 transition flags 
+		# for this column's children are forcefully unlocked.
+		var next_level_key = manager.get_chunk_key(parent_coord, parent_level + 1)
+		if pending_subdivisions.has(next_level_key):
+			pending_subdivisions.erase(next_level_key)
+
+		# 3. Recursively scrub and free all child nodes from memory
 		_clean_child_geometry(parent_chunk)
 
 		parent_chunk.current_lod = parent_level

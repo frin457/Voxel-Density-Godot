@@ -192,7 +192,11 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	var base_coord = coord
 	if job.lod_level > 0:
 		# Bitshift back to find the root LOD 0 column coordinate
-		base_coord = Vector3i(coord.x >> job.lod_level, coord.y >> job.lod_level, coord.z >> job.lod_level)
+		base_coord = Vector3i(
+			coord.x >> job.lod_level,
+			coord.y >> job.lod_level,
+			coord.z >> job.lod_level
+		)
 		
 	# FETCH CURRENT LIVE AUTHORIZATION LEVEL
 	var current_authorized_lod = authorized_lod_levels.get(base_coord, 0)
