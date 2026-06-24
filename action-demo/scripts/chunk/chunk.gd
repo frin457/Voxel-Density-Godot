@@ -19,6 +19,11 @@ var child_chunks: Array[Chunk] = []
 var active := true
 var lod_level := 0       # structural depth
 var current_lod := 0     # active subdivision state
+
+# TODO:
+# Currently unused.
+# Intended for upwards LOD invalidation (0->1->2)
+# example: terrain destruction modifies child chunks
 var lod_dirty := false
 
 

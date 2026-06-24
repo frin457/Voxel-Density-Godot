@@ -54,66 +54,94 @@ func rebuild(chunk: Chunk) -> void:
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
 	
-	var voxel_scale: float = chunk.voxel_size
-	
-	# Loop over every entry in the chunk's voxel dictionary
-	for local_pos in chunk.voxels:
-		var voxel = chunk.voxels[local_pos]
-		if not voxel: 
-			continue
-		
-		# Convert key positions to float space base positioning 
-		var voxel_origin = Vector3(local_pos) * voxel_scale
-		
-		# Check all 6 directions
-		for face_dir in NEIGHBOR_OFFSETS:
-			var offset = NEIGHBOR_OFFSETS[face_dir]
-			var neighbor_pos = local_pos + offset
-			
-			# If the neighbor is filled, cull this face (do not draw internal geometry)
-			if chunk.voxels.has(neighbor_pos):
-				continue
-				
-			# Calculate starting index before adding new face vertices
-			var vertex_start_index = vertices.size()
-			
-			# Add the 4 corner positions for this face layout multiplied by local chunk voxel sizing scales
-			for i in range(4):
-				var local_vertex_index = FACE_VERTICES[face_dir][i]
-				var vertex_pos = voxel_origin + (VERTICES[local_vertex_index] * voxel_scale)
-				
-				vertices.append(vertex_pos)
-				normals.append(FACE_NORMALS[face_dir])
-				colors.append(voxel.color if "color" in voxel else Color.WHITE)
-				
-			# Construct 2 triangles per face using explicit Counter-Clockwise configurations:
-			# Triangle 1: 0 -> 1 -> 2
-			indices.append(vertex_start_index + 0)
-			indices.append(vertex_start_index + 1)
-			indices.append(vertex_start_index + 2)
-			
-			# Triangle 2: 0 -> 2 -> 3
-			indices.append(vertex_start_index + 0)
-			indices.append(vertex_start_index + 2)
-			indices.append(vertex_start_index + 3)
+	var voxel_scale: float = chunk.voxel_size	
+	var chunk_size = chunk.chunk_size
+	for z in range(chunk_size):
+		for y in range(chunk_size):
+			for x in range(chunk_size):
 
-	# Package up and apply safely to the MeshInstance3D directly on main thread
-	var surface_arrays := []
-	surface_arrays.resize(Mesh.ARRAY_MAX)
-	
-	if vertices.size() > 0:
-		surface_arrays[Mesh.ARRAY_VERTEX] = vertices
-		surface_arrays[Mesh.ARRAY_INDEX] = indices
-		surface_arrays[Mesh.ARRAY_NORMAL] = normals
-		surface_arrays[Mesh.ARRAY_COLOR] = colors
+				var voxel_index = chunk.get_1d_index(x, y, z)
+
+				if chunk.voxel_ids[voxel_index] == 0:
+					continue
+
+				var voxel_origin = Vector3(
+					x,
+					y,
+					z
+				) * voxel_scale
+
+				var voxel_color = chunk.voxel_colors[voxel_index]
+
+				for face_dir in NEIGHBOR_OFFSETS:
+
+					var offset = NEIGHBOR_OFFSETS[face_dir]
+
+					var nx = x + offset.x
+					var ny = y + offset.y
+					var nz = z + offset.z
+
+					var neighbor_solid := false
+
+					if (
+						nx >= 0 and nx < chunk_size and
+						ny >= 0 and ny < chunk_size and
+						nz >= 0 and nz < chunk_size
+					):
+						var neighbor_index = chunk.get_1d_index(
+							nx,
+							ny,
+							nz
+						)
+
+						neighbor_solid = (
+							chunk.voxel_ids[neighbor_index] != 0
+						)
+
+					if neighbor_solid:
+						continue
+
+					var vertex_start_index = vertices.size()
+
+					for i in range(4):
+						var local_vertex_index = (
+							FACE_VERTICES[face_dir][i]
+						)
+
+						var vertex_pos = (
+							voxel_origin +
+							(VERTICES[local_vertex_index] * voxel_scale)
+						)
+
+						vertices.append(vertex_pos)
+						normals.append(FACE_NORMALS[face_dir])
+						colors.append(voxel_color)
+
+					indices.append(vertex_start_index + 0)
+					indices.append(vertex_start_index + 1)
+					indices.append(vertex_start_index + 2)
+
+					indices.append(vertex_start_index + 0)
+					indices.append(vertex_start_index + 2)
+					indices.append(vertex_start_index + 3)
+
+		# Package up and apply safely to the MeshInstance3D directly on main thread
+		var surface_arrays := []
+		surface_arrays.resize(Mesh.ARRAY_MAX)
 		
-		var new_mesh = ArrayMesh.new()
-		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
-		chunk.meshInstance.mesh = new_mesh
-		if chunk.mat:
-			chunk.meshInstance.set_surface_override_material(0, chunk.mat)
-	else:
-		chunk.meshInstance.mesh = null
-		
-	# Clear out the state flag so ChunkManager doesn't continually flag it as processing required
-	chunk.mesh_dirty = false
+		if vertices.size() > 0:
+			surface_arrays[Mesh.ARRAY_VERTEX] = vertices
+			surface_arrays[Mesh.ARRAY_INDEX] = indices
+			surface_arrays[Mesh.ARRAY_NORMAL] = normals
+			surface_arrays[Mesh.ARRAY_COLOR] = colors
+			
+			var new_mesh = ArrayMesh.new()
+			new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
+			chunk.meshInstance.mesh = new_mesh
+			if chunk.mat:
+				chunk.meshInstance.set_surface_override_material(0, chunk.mat)
+		else:
+			chunk.meshInstance.mesh = null
+			
+		# Clear out the state flag so ChunkManager doesn't continually flag it as processing required
+		chunk.mesh_dirty = false
