@@ -1,11 +1,19 @@
 extends CharacterBody3D
+
+signal chunk_changed(new_chunk_coords: Vector3i)
+
 @export var mouse_sensativity : float = 0.001
+@export var chunk_size: float = 32.0 # Adjust this to match your actual chunk size
+
 @onready var head: Node3D = $Head
 @onready var player_camera : Camera3D = $Head/PlayerCamera
 
 const SPEED = 5.0
 const JUMP_VELOCITY = 4.5
 var isFlying : bool = true
+
+# Tracks the discrete chunk coordinates to avoid redundant updates
+var current_chunk_coords: Vector3i = Vector3i(-99999, -99999, -99999)
 
 func _physics_process(delta: float) -> void:
 	up_direction = Vector3.UP
@@ -27,7 +35,6 @@ func _physics_process(delta: float) -> void:
 		isFlying = !isFlying
 			
 	# Get the input direction and handle the movement/deceleration.
-	# As good practice, you should replace UI actions with custom gameplay actions.
 	var input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
 	var direction := (player_camera.global_transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	if direction:
@@ -41,7 +48,23 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0, SPEED)
 		if isFlying:
 			velocity.y = move_toward(velocity.y, 0, SPEED)
+			
 	move_and_slide()
+
+	# --- CHUNK BOUNDARY CHECK ---
+	# Calculate current discrete chunk index based on global position
+	var new_coords = Vector3i(
+		floor(global_position.x / chunk_size),
+		floor(global_position.y / chunk_size),
+		floor(global_position.z / chunk_size)
+	)
+	
+	# Only fire updates when the player crosses over into a new chunk cell
+	if new_coords != current_chunk_coords:
+		current_chunk_coords = new_coords
+		chunk_changed.emit(current_chunk_coords)
+		# If your ChunkManager isn't hooked up via signals, you can directly call it here:
+		# ChunkManager.update_player_position(new_coords)
 
 
 func _unhandled_input(event: InputEvent) -> void:  
