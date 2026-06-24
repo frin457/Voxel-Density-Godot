@@ -273,7 +273,7 @@ func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 		job.lod_level
 	)
 	
-	job.data["voxels"] = voxel_data
+	job.data = voxel_data
 	_main_thread_instantiate_chunk.call_deferred(job)
 
 # ----------------------------

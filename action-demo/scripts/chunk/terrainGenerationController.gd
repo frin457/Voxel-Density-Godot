@@ -12,9 +12,25 @@ func generate_data(
 	color_array: Array[Color],
 	lod_level: int = 0
 ) -> Dictionary:
+	var voxel_count = (
+		chunk_resolution
+		* chunk_resolution
+		* chunk_resolution
+	)
 
-	var voxels := {}
+	var ids := PackedByteArray()
+	var density := PackedByteArray()
+	var colors := PackedColorArray()
 
+	ids.resize(voxel_count)
+	density.resize(voxel_count)
+	colors.resize(voxel_count)
+
+	colors.fill(Color(0,0,0,0))
+	
+	var index = func index(x: int, y: int, z: int) -> int:		
+		return x + (y * chunk_resolution) +(z * chunk_resolution * chunk_resolution)
+	
 	# We loop exactly from 0 to chunk_resolution - 1 to align with the grid 
 	for x in range(chunk_resolution):
 		for z in range(chunk_resolution):
@@ -41,17 +57,24 @@ func generate_data(
 			for y in range(vertical_resolution):
 				var world_y = chunk_position.y + (float(y) * voxel_size)
 
-				# Ensure voxels are generated right up to the line, allowing a tiny
-				# fractional overlap buffer if world_y is extremely close to the height boundary.
+				# Ensure voxels are generated right up to the line, allows overlap buffer 
+				#if world_y is extremely close to the height boundary.
 				if world_y > (terrain_height + (voxel_size * 0.1)):
 					break
 
 				var color_index = int(floor(world_y / voxel_size))
 				if color_index < 0:
 					color_index = abs(color_index)
+				var i = index.call(x,y,z)
+				#Assign properties
+				ids[i] = 1
+				density[i] = 255
 
-				voxels[Vector3i(x, y, z)] = Voxel.new(
-					color_array[color_index % color_array.size()]
-				)
-
-	return voxels
+				colors[i] = color_array[
+					color_index % color_array.size()
+				]
+	return {
+		"ids": ids,
+		"density": density,
+		"colors": colors
+	}
