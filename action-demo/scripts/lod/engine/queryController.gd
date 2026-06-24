@@ -1,4 +1,4 @@
-#./scripts/controllers/queryController.gd
+#./scripts/lod/engine/queryController.gd
 class_name QueryController extends RefCounted
 
 var manager: ChunkManager

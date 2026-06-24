@@ -1,3 +1,4 @@
+#./scripts/chunk/chunk.gd
 class_name Chunk extends StaticBody3D
 
 @export var mat: Material

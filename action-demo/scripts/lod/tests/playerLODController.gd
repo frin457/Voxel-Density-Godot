@@ -1,4 +1,4 @@
-# ./scripts/controllers/playerLODController.gd
+#./scripts/lod/tests/playerLODController.gd
 class_name PlayerLODController extends Node
 
 @onready var manager: ChunkManager = $".."

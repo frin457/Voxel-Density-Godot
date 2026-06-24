@@ -1,4 +1,4 @@
-# ./scripts/controllers/subdivisionController.gd
+#./scripts/lod/engine/subDivisionController.gd
 class_name SubdivisionController extends RefCounted
 
 var manager: ChunkManager
