@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://b4s5tiunt7gfn" path="res://scripts/world/world.gd" id="1_882fi"]
 [ext_resource type="PackedScene" uid="uid://co68l2ekwhii8" path="res://controller/unit/player.tscn" id="2_3h5nr"]
 [ext_resource type="Script" uid="uid://cchlfslsnl51m" path="res://scripts/chunk/chunkManager.gd" id="3_882fi"]
-[ext_resource type="Script" uid="uid://c88apb3ttnttf" path="res://scripts/controllers/lod/playerLODController.gd" id="4_3h5nr"]
+[ext_resource type="Script" uid="uid://c88apb3ttnttf" path="res://scripts/lod/tests/playerLODController.gd" id="4_3h5nr"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3h5nr"]
 shading_mode = 0
