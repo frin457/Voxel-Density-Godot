@@ -79,7 +79,7 @@ func activate() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	
 	if meshInstance:		meshInstance.visible = true
-	if collisionShape:	collisionShape.shape = null
+	if collisionShape:	collisionShape.shape.set_deferred("disabled",false)
 
 
 func destroy_voxel(position) -> void:
@@ -125,19 +125,15 @@ func set_voxel_data(data: Dictionary) -> void:
 
 func _update_surface_cache() -> void:
 	is_empty_air = true
+	
 	for k in sub_quadrant_has_surfaces.keys():
 		sub_quadrant_has_surfaces[k] = false
 
-	if is_empty_air:
-		return
-	
-	var quadrant_count := 0
 	var half_size = float(chunk_size) * 0.5
 
 	for z in range(chunk_size):
 		for y in range(chunk_size):
 			for x in range(chunk_size):
-				quadrant_count += 1
 				var index = get_1d_index(x, y, z)
 
 				if voxel_ids[index] == 0:
@@ -152,7 +148,6 @@ func _update_surface_cache() -> void:
 				sub_quadrant_has_surfaces[
 					Vector3i(q_x, q_y, q_z)
 				] = true
-				if quadrant_count == 8: return
 
 
 func mark_dirty() -> void:

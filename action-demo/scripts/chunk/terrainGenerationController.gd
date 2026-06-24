@@ -50,11 +50,7 @@ func generate_data(
 			var adjusted = pow(normalized, terrainExponent)
 			var terrain_height = max_world_height * adjusted
 
-			var vertical_resolution = int(
-				chunk_resolution * pow(2, lod_level)
-			)
-
-			for y in range(vertical_resolution):
+			for y in range(chunk_resolution):
 				var world_y = chunk_position.y + (float(y) * voxel_size)
 
 				# Ensure voxels are generated right up to the line, allows overlap buffer 

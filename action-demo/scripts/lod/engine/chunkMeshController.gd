@@ -125,23 +125,30 @@ func rebuild(chunk: Chunk) -> void:
 					indices.append(vertex_start_index + 2)
 					indices.append(vertex_start_index + 3)
 
-		# Package up and apply safely to the MeshInstance3D directly on main thread
-		var surface_arrays := []
-		surface_arrays.resize(Mesh.ARRAY_MAX)
+	# Package up and apply safely to the MeshInstance3D directly on main thread
+	var surface_arrays := []
+	surface_arrays.resize(Mesh.ARRAY_MAX)
 		
-		if vertices.size() > 0:
-			surface_arrays[Mesh.ARRAY_VERTEX] = vertices
-			surface_arrays[Mesh.ARRAY_INDEX] = indices
-			surface_arrays[Mesh.ARRAY_NORMAL] = normals
-			surface_arrays[Mesh.ARRAY_COLOR] = colors
-			
-			var new_mesh = ArrayMesh.new()
-			new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
-			chunk.meshInstance.mesh = new_mesh
-			if chunk.mat:
-				chunk.meshInstance.set_surface_override_material(0, chunk.mat)
-		else:
-			chunk.meshInstance.mesh = null
-			
-		# Clear out the state flag so ChunkManager doesn't continually flag it as processing required
-		chunk.mesh_dirty = false
+	if vertices.size() > 0:
+		surface_arrays[Mesh.ARRAY_VERTEX] = vertices
+		surface_arrays[Mesh.ARRAY_INDEX] = indices
+		surface_arrays[Mesh.ARRAY_NORMAL] = normals
+		surface_arrays[Mesh.ARRAY_COLOR] = colors
+		
+		var new_mesh = ArrayMesh.new()
+		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
+		chunk.meshInstance.mesh = new_mesh
+		
+		var trimesh_shape = new_mesh.create_trimesh_shape()
+		#if chunk.collision_shape_node != null:
+		chunk.collisionShape.shape = trimesh_shape
+		chunk.collisionShape.disabled = false
+		
+		if chunk.mat:
+			chunk.meshInstance.set_surface_override_material(0, chunk.mat)
+	else:
+		chunk.meshInstance.mesh = null
+		
+	# Clear out the state flag so ChunkManager doesn't continually flag it as processing required
+	chunk.mesh_dirty = false
+	chunk.collision_dirty = false
