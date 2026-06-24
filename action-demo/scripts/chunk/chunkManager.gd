@@ -227,7 +227,7 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	add_child(chunk)
 	chunks[key] = chunk
 	
-	chunk.set_voxel_data(job.data["voxels"])
+	chunk.set_voxel_data(job.data)
 	
 	if isDev:
 		_create_chunk_wireframe_bounds(chunk)
@@ -273,7 +273,7 @@ func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 		job.lod_level
 	)
 	
-	job.data["voxels"] = voxel_data
+	job.data = voxel_data
 	_main_thread_instantiate_chunk.call_deferred(job)
 
 # ----------------------------
