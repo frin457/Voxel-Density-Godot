@@ -1,5 +1,5 @@
 #./scripts/lod/chunk/surfaces/mesh/baseMesher.gd
-class_name BaseVoxelMesher extends RefCounted
+class_name BaseMesher extends RefCounted
 
 ## Analyzes voxel data and returns an array compatible with ArrayMesh.add_surface_from_arrays()
 func generate_mesh_data(chunk: Chunk) -> Array:

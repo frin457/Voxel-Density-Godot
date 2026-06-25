@@ -1,5 +1,5 @@
 #./scripts/lod/chunk/surfaces/mesh/standardMesher.gd
-class_name CulledVoxelMesher extends BaseVoxelMesher
+class_name StandardMesher extends BaseMesher
 
 const VERTICES = [
 	Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(1, 1, 0), Vector3(0, 1, 0),

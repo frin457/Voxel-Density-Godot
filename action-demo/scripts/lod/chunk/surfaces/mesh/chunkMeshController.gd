@@ -2,7 +2,7 @@
 class_name ChunkMeshController extends RefCounted
 
 ## The active meshing strategy. Can be rotated at runtime!
-var active_mesher: BaseVoxelMesher = CulledVoxelMesher.new()
+var active_mesher: BaseMesher = StandardMesher.new()
 
 ## Entry point invoked by ChunkManager during the dirty chunk processing queue loop
 func rebuild(chunk: Chunk) -> void:
