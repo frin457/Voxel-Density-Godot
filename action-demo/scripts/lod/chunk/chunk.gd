@@ -79,7 +79,7 @@ func activate() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	
 	if meshInstance:		meshInstance.visible = true
-	if collisionShape:	collisionShape.shape.set_deferred("disabled",false)
+	if collisionShape:	collisionShape.set_deferred("disabled",false)
 
 
 func destroy_voxel(position) -> void:
