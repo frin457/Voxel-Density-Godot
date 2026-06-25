@@ -3,18 +3,18 @@ class_name PlayerLODController extends Node
 
 @onready var manager: ChunkManager = $".."
 
-@export var movement_threshold: float = 1.0
-@export var rotation_threshold_degrees: float = 10.0
+@export var movement_threshold: float = 2.0
+@export var rotation_threshold_degrees: float = 25.0
 
-var last_tracked_coord := Vector3i(999999, 999999, 999999)
-var last_tracked_rotation := Vector3(0,0,0)
-var last_player_position := Vector3.ZERO
+var last_chunk_coordinate := Vector3i(999999.0, 999999.0, 999999.0)
+var last_player_position = Vector3.ZERO
+var last_player_rotation = Vector3.ZERO
 
 var requested_lod_map := {} 
+var prev_lod_map := {}
 
 const MAX_UPGRADES_PER_FRAME = 4
 const MAX_DOWNGRADES_PER_FRAME = 8 
-const KEEP_NEIGHBORS_LOD1_LOADED = true
 
 func _ready() -> void:
 	if not manager:
@@ -31,72 +31,87 @@ func _process(_delta: float) -> void:
 	
 	var current_pos = camera.global_position
 	var current_rot = camera.global_rotation_degrees
+	var chunk_world_size = manager.get_chunk_world_size()
 	
-	# Check thresholds
+	var center_coord = Vector3(
+		floor(current_pos.x / chunk_world_size),
+		floor(current_pos.y / chunk_world_size),
+		floor(current_pos.z / chunk_world_size)
+	)
+	# Threshold check
 	var moved = current_pos.distance_to(last_player_position) > movement_threshold
-	var rotated = current_rot.distance_to(last_tracked_rotation) > rotation_threshold_degrees
+	var rotated = current_rot.distance_to(last_player_rotation) > rotation_threshold_degrees
 	
 	if moved or rotated:
-		last_tracked_coord = current_pos
-		last_tracked_rotation = current_rot
+		# Update globals
+		last_player_position = current_pos
+		last_player_rotation = current_rot
+		last_chunk_coordinate = center_coord
 		update_lod(camera)
-
-
-
+		
 func update_lod(camera: Camera3D) -> void:
-	var player_position = camera.global_position
-	var player_rotation = camera.rotation
+
+	var player_pos = last_player_position
 	var chunk_world_size = manager.get_chunk_world_size()
-	var center_coord = Vector3i(
-		floor(player_position.x / chunk_world_size),
-		floor(player_position.y / chunk_world_size),
-		floor(player_position.z / chunk_world_size)
-	)
+	var center_coord = last_chunk_coordinate	
 	var camera_forward = -camera.global_transform.basis.z.normalized()
-	
-	last_tracked_rotation = player_rotation
-	last_tracked_coord = player_position
-	
-	var target_lod_map := {}
+	var target_lod_map = {}
+
+	# Active Chunks
 	const rangeMin = -2
 	const rangeMax = 3
+	const buffer = 1
+	# 0.0 is exactly 90 degrees (flat plane to the camera). 
+	# -0.2 gives "peripheral vision" so chunks don't pop in at the edges.
+	const visibility_threshold = .5
+	
 	for x in range(rangeMin, rangeMax):
 		for z in range(rangeMin, rangeMax):
 			for y in range(rangeMin, rangeMax): 
 				var offset_coord = center_coord + Vector3i(x, y, z)
-				#Prioritze 'center' chunk (player location)
-				if x == 0 and y == 0 and z == 0:
+
+				# Center buffer MUST remain loaded (prevents falling through the floor)
+				if abs(x) <= buffer and abs(y) <= buffer and abs(z) <= buffer:
 					target_lod_map[offset_coord] = 2
-					continue # Skip the rest for the center chunk
-			
-				# Process surroundings only when not already set
-				if KEEP_NEIGHBORS_LOD1_LOADED:
-					target_lod_map[offset_coord] = 1
-				else:
+					continue
+				
+				# Find the center of the target chunk in world space
+				var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
+				var dir_to_chunk = (chunk_center_world - player_pos).normalized()
+				
+				# Check if chunk is within camera fov
+				var dot_product = camera_forward.dot(dir_to_chunk)
+				
+				if dot_product < visibility_threshold:
+					continue 
+				
+				target_lod_map[offset_coord] = 1
 
-					var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
-					var dir_to_chunk = (chunk_center_world - player_position).normalized()
-					var dot_product = camera_forward.dot(dir_to_chunk)
-					
-					if dot_product > 0.4:
-						target_lod_map[offset_coord] = 1 
-					elif dot_product < 0.1:
-						target_lod_map[offset_coord] = 0
-					else:
-							target_lod_map[offset_coord] = requested_lod_map.get(offset_coord, 0)
+	# If it was in our history and not in our new grid, downgrade chunk
+	for coord in prev_lod_map:
+		if not target_lod_map.has(coord):
+			# Only add it to our evaluation list if it hasn't finished hitting LOD 0 yet, 
+			# or if it is actively in flight.
+			if prev_lod_map[coord] > 0 or requested_lod_map.has(coord):
+				target_lod_map[coord] = 0
 
+	# Evaluate chunks that changed states OR are actively transitioning
+	var coords_to_evaluate := []
+	for coord in target_lod_map:
+		var new_intended_lod = target_lod_map[coord]
+		var old_cached_lod = prev_lod_map.get(coord, -1)
+		
+		# Is this chunk currently performing transition?
+		var is_in_flight = requested_lod_map.has(coord)
+		
+		if new_intended_lod == old_cached_lod and not is_in_flight:
+			continue 
+		
+		coords_to_evaluate.append(coord)
+
+	# DIFFERENCES ONLY
 	var upgrades_dispatched = 0
 	var downgrades_dispatched = 0
-	var coords_to_evaluate := []
-	
-	for coord in target_lod_map:
-		coords_to_evaluate.append(coord)
-		
-	for key in manager.chunks.keys():
-		var chunk = manager.chunks[key]
-		if is_instance_valid(chunk) and chunk.lod_level == 0:
-			if not target_lod_map.has(chunk.chunk_coordinate):
-				coords_to_evaluate.append(chunk.chunk_coordinate)
 
 	for chunk_coord in coords_to_evaluate:
 		var key = manager.get_chunk_key(chunk_coord, 0)
@@ -114,36 +129,29 @@ func update_lod(camera: Camera3D) -> void:
 			var in_flight = requested_lod_map.get(chunk_coord, -1)
 			if in_flight == current_lod:
 				requested_lod_map.erase(chunk_coord)
-			elif in_flight > desired_lod:
-				# Downgrade cancellation / stale structural guard
-				manager.set_authorized_lod(chunk_coord, desired_lod)
-				requested_lod_map.erase(chunk_coord)
 			continue
 
 		if desired_lod > current_lod:
 			var next_lod = current_lod + 1
-			if requested_lod_map.get(chunk_coord, -1) == next_lod:
-				continue
-			if chunk_coord != center_coord and upgrades_dispatched >= MAX_UPGRADES_PER_FRAME:
-				continue
+			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue
+			if chunk_coord != center_coord and upgrades_dispatched >= MAX_UPGRADES_PER_FRAME: continue
 				
-			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod, player_position)
+			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod, player_pos)
 			upgrades_dispatched += 1
 			requested_lod_map[chunk_coord] = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
 		else:
 			var next_lod = current_lod - 1
-			if requested_lod_map.get(chunk_coord, -1) == next_lod:
-				continue
-			if chunk_coord != center_coord and downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME:
-				continue
+			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue
+			if chunk_coord != center_coord and downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME: continue
 				
 			_downgrade_chunk_lod(chunk_coord, current_lod, next_lod)
 			downgrades_dispatched += 1
 			requested_lod_map[chunk_coord] = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
-			
 
+	# Preserve history for the next frame
+	prev_lod_map = target_lod_map
 
 func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int, player_pos: Vector3) -> void:
 	var scale := 1 << from_lod
@@ -163,7 +171,6 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int, player_pos:
 					var dist = world_pos.distance_to(player_pos)
 					potential_jobs.append({"coord": target_coord, "dist": dist})
 	
-	# Sort by distance: Closest chunks first (lowest distance = highest priority)
 	potential_jobs.sort_custom(func(a, b): return a.dist < b.dist)
 	
 	for job in potential_jobs:
@@ -188,7 +195,6 @@ func _downgrade_chunk_lod(
 		coord,
 		to_lod
 	)
-
 
 func _chunk_contains_surfaces(coord: Vector3i, target_lod: int) -> bool:
 	if target_lod == 0:
@@ -215,7 +221,6 @@ func _chunk_contains_surfaces(coord: Vector3i, target_lod: int) -> bool:
 			return parent_quadrant_has_surfaces(parent_chunk, local_offset)
 				
 	return true
-
 
 func parent_quadrant_has_surfaces(parent_chunk: Chunk, local_offset: Vector3i) -> bool:
 	if is_instance_valid(parent_chunk):
