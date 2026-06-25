@@ -1,4 +1,4 @@
-#./scripts/world.gd
+#./scripts/lod/chunk/world/world.gd
 extends Node3D
 
 @export var isDev: bool = true

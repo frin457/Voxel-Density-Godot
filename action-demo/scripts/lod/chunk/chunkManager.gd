@@ -1,4 +1,4 @@
-#./scripts/chunk/chunkManager.gd
+#./scripts/lod/chunk/chunkManager.gd
 class_name ChunkManager extends Node
 
 # Global Parameters 
@@ -54,7 +54,7 @@ signal generation_completed()
 
 var dirty_chunks_processed_this_frame := 0
 var random := FastNoiseLite.new()
-var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
+var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
 
 # Helper to build an octree safe identifier key
 func get_chunk_key(coord: Vector3i, lod: int) -> String:

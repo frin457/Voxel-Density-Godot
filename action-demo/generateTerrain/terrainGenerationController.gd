@@ -1,4 +1,4 @@
-#./scripts/controllers/terrainGenerationController.gd
+#./generateTerrain/terrainGenerationController.gd
 class_name TerrainGenerationController extends RefCounted
 
 @export var terrainExponent = 1.5

@@ -1,4 +1,4 @@
-#./scripts/chunk/chunkJobQueue.gd
+#./scripts/lod/chunk/chunkJobQueue.gd
 class_name ChunkJobQueue extends RefCounted
 
 var queue: Array[ChunkJob] = []

@@ -1,4 +1,4 @@
-#./scripts/lod/engine/chunkMeshController.gd
+#./scripts/lod/chunk/surfaces/mesh/chunkMeshController.gd
 class_name ChunkMeshController extends RefCounted
 
 # The 8 corners of a standard canonical unit cube
