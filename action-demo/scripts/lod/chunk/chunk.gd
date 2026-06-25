@@ -82,7 +82,7 @@ func activate() -> void:
 	if collisionShape:	collisionShape.set_deferred("disabled",false)
 
 
-func destroy_voxel(position) -> void:
+func destroy_voxel() -> void:
 	var index = get_1d_index(position.x,	position.y,	position.z)
 
 	if voxel_ids[index] == 0: return
@@ -95,7 +95,7 @@ func destroy_voxel(position) -> void:
 	#mark_lod_dirty()
 
 
-func restore_voxel(position) -> void:
+func restore_voxel() -> void:
 	var index = get_1d_index(position.x,position.y,position.z)
 
 	if original_voxel_ids[index] == 0: return

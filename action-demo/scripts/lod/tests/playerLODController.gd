@@ -6,13 +6,7 @@ class_name PlayerLODController extends Node
 var last_tracked_coord := Vector3i(999999, 999999, 999999)
 var requested_lod_map := {} 
 
-@export_group("Velocity Gating")
-@export var speed_threshold_lod2: float = 8.0
-@export var settle_duration: float = 0.25
-
 var last_player_position := Vector3.ZERO
-var current_speed := 0.0
-var settle_timer := 0.0
 
 const MAX_UPGRADES_PER_FRAME = 8
 const MAX_DOWNGRADES_PER_FRAME = 16 
@@ -27,25 +21,13 @@ func _ready() -> void:
 	if not manager:
 		push_error("PlayerLODController Error: Cannot find ChunkManager!")
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if not manager:
 		return
 		
 	var camera = get_viewport().get_camera_3d()
 	if not camera:
 		return
-		
-	var current_position = camera.global_position
-	if last_player_position != Vector3.ZERO and delta > 0.0:
-		current_speed = (current_position - last_player_position).length() / delta
-	else:
-		current_speed = 0.0
-	last_player_position = current_position
-
-	if current_speed < speed_threshold_lod2:
-		settle_timer += delta
-	else:
-		settle_timer = 0.0 
 
 	update_lod(camera)
 
@@ -53,7 +35,6 @@ func _process(delta: float) -> void:
 func update_lod(camera: Camera3D) -> void:
 	var player_position = camera.global_position
 	var chunk_world_size = manager.get_chunk_world_size()
-	
 	var center_coord = Vector3i(
 		floor(player_position.x / chunk_world_size),
 		floor(player_position.y / chunk_world_size),
@@ -62,8 +43,6 @@ func update_lod(camera: Camera3D) -> void:
 	
 	last_tracked_coord = center_coord
 	var camera_forward = -camera.global_transform.basis.z.normalized()
-	var is_allowed_lod2 = (current_speed < speed_threshold_lod2) and (settle_timer >= settle_duration)
-	
 	var target_lod_map := {}
 	const rangeMin = -2
 	const rangeMax = 3
@@ -71,24 +50,26 @@ func update_lod(camera: Camera3D) -> void:
 		for z in range(rangeMin, rangeMax):
 			for y in range(rangeMin, rangeMax): 
 				var offset_coord = center_coord + Vector3i(x, y, z)
-				
+				#Prioritze 'center' chunk (player location)
 				if x == 0 and y == 0 and z == 0:
-					target_lod_map[offset_coord] = 2 if is_allowed_lod2 else 1
+					target_lod_map[offset_coord] = 2
+					continue # Skip the rest for the center chunk
+			
+				# Process surroundings only when not already set
+				if KEEP_NEIGHBORS_LOD1_LOADED:
+					target_lod_map[offset_coord] = 1
 				else:
-					if not target_lod_map.has(offset_coord):
-						if KEEP_NEIGHBORS_LOD1_LOADED:
-							target_lod_map[offset_coord] = 1
-						else:
-							var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
-							var dir_to_chunk = (chunk_center_world - player_position).normalized()
-							var dot_product = camera_forward.dot(dir_to_chunk)
-							
-							if dot_product > 0.4:
-								target_lod_map[offset_coord] = 1 
-							elif dot_product < 0.1:
-								target_lod_map[offset_coord] = 0
-							else:
-								target_lod_map[offset_coord] = requested_lod_map.get(offset_coord, 0)
+
+					var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
+					var dir_to_chunk = (chunk_center_world - player_position).normalized()
+					var dot_product = camera_forward.dot(dir_to_chunk)
+					
+					if dot_product > 0.4:
+						target_lod_map[offset_coord] = 1 
+					elif dot_product < 0.1:
+						target_lod_map[offset_coord] = 0
+					else:
+							target_lod_map[offset_coord] = requested_lod_map.get(offset_coord, 0)
 
 	var upgrades_dispatched = 0
 	var downgrades_dispatched = 0
@@ -132,7 +113,7 @@ func update_lod(camera: Camera3D) -> void:
 			if chunk_coord != center_coord and upgrades_dispatched >= MAX_UPGRADES_PER_FRAME:
 				continue
 				
-			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod)
+			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod, player_position)
 			upgrades_dispatched += 1
 			requested_lod_map[chunk_coord] = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
@@ -149,8 +130,10 @@ func update_lod(camera: Camera3D) -> void:
 			manager.set_authorized_lod(chunk_coord, next_lod)
 
 
-func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
+func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int, player_pos: Vector3) -> void:
 	var scale := 1 << from_lod
+	var potential_jobs := []
+	
 	for x in range(scale):
 		for y in range(scale):
 			for z in range(scale):
@@ -160,8 +143,16 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 					coord.z * scale + z
 				)
 				if _chunk_contains_surfaces(target_coord, to_lod):
-					manager.subdivision_controller.request_subdivision(target_coord, to_lod)
-
+					# We need the world position to calculate priority
+					var world_pos = Vector3(target_coord) * manager.get_chunk_world_size()
+					var dist = world_pos.distance_to(player_pos)
+					potential_jobs.append({"coord": target_coord, "dist": dist})
+	
+	# Sort by distance: Closest chunks first (lowest distance = highest priority)
+	potential_jobs.sort_custom(func(a, b): return a.dist < b.dist)
+	
+	for job in potential_jobs:
+		manager.subdivision_controller.request_subdivision(job.coord, to_lod)
 
 func _downgrade_chunk_lod(
 	coord: Vector3i,

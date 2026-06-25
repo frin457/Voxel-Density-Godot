@@ -284,7 +284,6 @@ func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 		dimensions.y,
 		random,
 		colors,
-		job.lod_level
 	)
 	
 	job.data = voxel_data
