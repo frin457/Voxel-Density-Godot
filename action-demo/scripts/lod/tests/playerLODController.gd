@@ -8,14 +8,14 @@ var requested_lod_map := {}
 
 @export_group("Velocity Gating")
 @export var speed_threshold_lod2: float = 8.0
-@export var settle_duration: float = 0.4
+@export var settle_duration: float = 0.25
 
 var last_player_position := Vector3.ZERO
 var current_speed := 0.0
 var settle_timer := 0.0
 
-const MAX_UPGRADES_PER_FRAME = 2
-const MAX_DOWNGRADES_PER_FRAME = 8 # Or 16
+const MAX_UPGRADES_PER_FRAME = 8
+const MAX_DOWNGRADES_PER_FRAME = 16 
 const KEEP_NEIGHBORS_LOD1_LOADED = true
 
 func _ready() -> void:
@@ -65,8 +65,8 @@ func update_lod(camera: Camera3D) -> void:
 	var is_allowed_lod2 = (current_speed < speed_threshold_lod2) and (settle_timer >= settle_duration)
 	
 	var target_lod_map := {}
-	const rangeMin = -1
-	const rangeMax = 2 
+	const rangeMin = -2
+	const rangeMax = 3
 	for x in range(rangeMin, rangeMax):
 		for z in range(rangeMin, rangeMax):
 			for y in range(rangeMin, rangeMax): 

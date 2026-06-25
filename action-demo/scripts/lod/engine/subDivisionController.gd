@@ -76,19 +76,24 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 	if manager.chunks.has(parent_key):
 		var parent_chunk = manager.chunks[parent_key]
 
-		# 1. Clear for root level (e.g., LOD 0)
-		var current_level_key = manager.get_chunk_key(parent_coord, parent_level)
-		if pending_subdivisions.has(current_level_key):
-			pending_subdivisions.erase(current_level_key)
+		# 1. Clear the gate for this parent chunk level
+		if pending_subdivisions.has(parent_key):
+			pending_subdivisions.erase(parent_key)
 
-		# 2. CRITICAL GRID FIX: Clear the gate for the level right above it (e.g., LOD 1)
-		# This ensures that any historic or dropped LOD 1 -> LOD 2 transition flags 
-		# for this column's children are forcefully unlocked.
-		var next_level_key = manager.get_chunk_key(parent_coord, parent_level + 1)
-		if pending_subdivisions.has(next_level_key):
-			pending_subdivisions.erase(next_level_key)
+		# 2. GRID FIX: Clear gates for all 8 potential child coordinates
+		# We must bit-shift the parent coordinate forward to match the children's coordinate space
+		for x in range(2):
+			for y in range(2):
+				for z in range(2):
+					var child_coord = (parent_coord * 2) + Vector3i(x, y, z)
+					var child_key = manager.get_chunk_key(child_coord, parent_level + 1)
+					
+					if pending_subdivisions.has(child_key):
+						pending_subdivisions.erase(child_key)
+					if pending_merges.has(child_key):
+						pending_merges.erase(child_key)
 
-		# 3. Recursively scrub and free all child nodes from memory
+		# 3. Recursively scrub and free all child nodes from memory safely
 		_clean_child_geometry(parent_chunk)
 
 		parent_chunk.current_lod = parent_level
@@ -139,10 +144,23 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 		return
 
 	var parent_chunk = chunk.parent_chunk
-
 	if not is_instance_valid(parent_chunk):
 		return
-
+		
+	# Generate the exact key used to gate this parent's subdivision
+	var parent_key = manager.get_chunk_key(parent_chunk.chunk_coordinate, chunk.lod_level - 1)
+	
+	# If the parent key is missing from pending_subdivisions, a merge operation 
+	# has canceled this split. This child is a true asynchronous ghost thread.
+	if not pending_subdivisions.has(parent_key):
+		if manager.isDev:
+			print("SubdivisionController: Aborting late-arrival child chunk at ", chunk.chunk_coordinate)
+		
+		var child_key = manager.get_chunk_key(chunk.chunk_coordinate, chunk.lod_level)
+		manager.chunks.erase(child_key)
+		chunk.queue_free()
+		return
+		
 	var all_siblings_ready := true
 
 	if parent_chunk.child_chunks.size() < 8:
