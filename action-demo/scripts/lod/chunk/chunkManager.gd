@@ -142,7 +142,6 @@ func _process(_delta: float) -> void:
 	while i >= 0:
 		var task_id = active_thread_tasks[i]
 		if WorkerThreadPool.is_task_completed(task_id):
-			WorkerThreadPool.wait_for_task_completion(task_id)
 			active_thread_tasks.remove_at(i)
 		i -= 1
 
@@ -167,7 +166,8 @@ func _process(_delta: float) -> void:
 	if dirty_chunks.size() > 128 and isDev:
 		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Current count: ", dirty_chunks.size())
 
-	while dirty_chunks.size() > 0:
+	#while dirty_chunks.size() > 0:
+	for m in range(min(dirty_chunks.size(), 128)):
 		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
 			break 
 			
@@ -251,11 +251,11 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 
 func process_chunk(chunk: Chunk) -> void:
 	# Lifecycle check safety guard
-	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
+	if not is_instance_valid(chunk) and chunk.is_queued_for_deletion():
 		return
 		
 	dirty_chunks_processed_this_frame += 1
-
+	
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
 
@@ -358,11 +358,6 @@ func _link_subdivision_hierarchy(
 		var parent_chunk: Chunk = chunks[parent_key]
 
 		child_chunk.parent_chunk = parent_chunk
-
-		parent_chunk.child_chunks = parent_chunk.child_chunks.filter(
-			func(c):
-				return is_instance_valid(c)
-		)
 
 		if not parent_chunk.child_chunks.has(child_chunk):
 			parent_chunk.child_chunks.append(child_chunk)

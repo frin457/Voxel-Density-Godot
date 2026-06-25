@@ -3,7 +3,13 @@ class_name PlayerLODController extends Node
 
 @onready var manager: ChunkManager = $".."
 
+@export var movement_threshold: float = 1.0
+@export var rotation_threshold_degrees: float = 10.0
+
 var last_tracked_coord := Vector3i(999999, 999999, 999999)
+var last_tracked_rotation := Vector3(0,0,0)
+var last_player_position := Vector3.ZERO
+
 var requested_lod_map := {} 
 
 const MAX_UPGRADES_PER_FRAME = 4
@@ -20,38 +26,37 @@ func _ready() -> void:
 		push_error("PlayerLODController Error: Cannot find ChunkManager!")
 
 func _process(_delta: float) -> void:
-	if not manager:
-		return
-		
 	var camera = get_viewport().get_camera_3d()
-	var chunk_size = manager.chunk_size
-	var player_position = camera.global_position
-	var center_coord = Vector3i(
-		floor(player_position.x / manager.chunk_size),
-		floor(player_position.y / chunk_size),
-		floor(player_position.z / chunk_size)
-	)
+	if not camera: return
 	
-	if center_coord == last_tracked_coord:
-		return
+	var current_pos = camera.global_position
+	var current_rot = camera.global_rotation_degrees
 	
-	if not camera:
-		return
+	# Check thresholds
+	var moved = current_pos.distance_to(last_player_position) > movement_threshold
+	var rotated = current_rot.distance_to(last_tracked_rotation) > rotation_threshold_degrees
+	
+	if moved or rotated:
+		last_tracked_coord = current_pos
+		last_tracked_rotation = current_rot
+		update_lod(camera)
 
-	update_lod(camera)
 
 
 func update_lod(camera: Camera3D) -> void:
 	var player_position = camera.global_position
+	var player_rotation = camera.rotation
 	var chunk_world_size = manager.get_chunk_world_size()
 	var center_coord = Vector3i(
 		floor(player_position.x / chunk_world_size),
 		floor(player_position.y / chunk_world_size),
 		floor(player_position.z / chunk_world_size)
 	)
-	
-	last_tracked_coord = center_coord
 	var camera_forward = -camera.global_transform.basis.z.normalized()
+	
+	last_tracked_rotation = player_rotation
+	last_tracked_coord = player_position
+	
 	var target_lod_map := {}
 	const rangeMin = -2
 	const rangeMax = 3
@@ -137,6 +142,7 @@ func update_lod(camera: Camera3D) -> void:
 			downgrades_dispatched += 1
 			requested_lod_map[chunk_coord] = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
+			
 
 
 func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int, player_pos: Vector3) -> void:
