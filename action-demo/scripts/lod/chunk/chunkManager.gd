@@ -263,8 +263,8 @@ func process_chunk(chunk: Chunk) -> void:
 		if subdivision_controller and subdivision_controller.has_method("notify_chunk_mesh_ready"):
 			subdivision_controller.notify_chunk_mesh_ready(chunk)
 			
-	if chunk.collision_dirty:
-		collision_controller.rebuild(chunk)
+	#if chunk.collision_dirty:
+		#collision_controller.rebuild(chunk)
 		
 # ----------------------------
 # BACKGROUND THREAD EXECUTION BLOCK

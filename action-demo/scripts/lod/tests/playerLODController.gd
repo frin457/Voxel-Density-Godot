@@ -6,10 +6,8 @@ class_name PlayerLODController extends Node
 var last_tracked_coord := Vector3i(999999, 999999, 999999)
 var requested_lod_map := {} 
 
-var last_player_position := Vector3.ZERO
-
-const MAX_UPGRADES_PER_FRAME = 8
-const MAX_DOWNGRADES_PER_FRAME = 16 
+const MAX_UPGRADES_PER_FRAME = 4
+const MAX_DOWNGRADES_PER_FRAME = 8 
 const KEEP_NEIGHBORS_LOD1_LOADED = true
 
 func _ready() -> void:
@@ -26,6 +24,17 @@ func _process(_delta: float) -> void:
 		return
 		
 	var camera = get_viewport().get_camera_3d()
+	var chunk_size = manager.chunk_size
+	var player_position = camera.global_position
+	var center_coord = Vector3i(
+		floor(player_position.x / manager.chunk_size),
+		floor(player_position.y / chunk_size),
+		floor(player_position.z / chunk_size)
+	)
+	
+	if center_coord == last_tracked_coord:
+		return
+	
 	if not camera:
 		return
 
