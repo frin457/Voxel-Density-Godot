@@ -1,4 +1,4 @@
-#./scripts/debug/lodWaveController.gd
+#./scripts/lod/tests/waveLODController.gd
 extends Node
 class_name LODWaveController
 

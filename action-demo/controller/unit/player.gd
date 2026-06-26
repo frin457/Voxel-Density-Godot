@@ -1,3 +1,4 @@
+#./controller/unit/player.gd
 extends CharacterBody3D
 
 signal chunk_changed(new_chunk_coords: Vector3i)

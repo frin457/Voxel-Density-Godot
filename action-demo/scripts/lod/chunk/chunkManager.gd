@@ -1,4 +1,4 @@
-#./scripts/chunk/chunkManager.gd
+#./scripts/lod/chunk/chunkManager.gd
 class_name ChunkManager extends Node
 
 # Global Parameters 
@@ -54,7 +54,7 @@ signal generation_completed()
 
 var dirty_chunks_processed_this_frame := 0
 var random := FastNoiseLite.new()
-var chunk_scene = preload("res://scripts/chunk/chunk.tscn")
+var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
 
 # Helper to build an octree safe identifier key
 func get_chunk_key(coord: Vector3i, lod: int) -> String:
@@ -142,7 +142,6 @@ func _process(_delta: float) -> void:
 	while i >= 0:
 		var task_id = active_thread_tasks[i]
 		if WorkerThreadPool.is_task_completed(task_id):
-			WorkerThreadPool.wait_for_task_completion(task_id)
 			active_thread_tasks.remove_at(i)
 		i -= 1
 
@@ -164,10 +163,11 @@ func _process(_delta: float) -> void:
 	dirty_chunks_processed_this_frame = 0
 	
 	# Queue Backlog Threshold Alert Warning
-	if dirty_chunks.size() > 128:
+	if dirty_chunks.size() > 128 and isDev:
 		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Current count: ", dirty_chunks.size())
 
-	while dirty_chunks.size() > 0:
+	#while dirty_chunks.size() > 0:
+	for m in range(min(dirty_chunks.size(), 128)):
 		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
 			break 
 			
@@ -188,29 +188,36 @@ func _process(_delta: float) -> void:
 func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	var coord = job.chunk_coordinate
 	
-	# 1. DYNAMIC AUTHORIZATION DEPTH CHECK
+	# DYNAMIC AUTHORIZATION DEPTH CHECK
 	var base_coord = coord
 	if job.lod_level > 0:
-		# Bitshift back to find the root LOD 0 column coordinate
+		# Mathematically calculate the exact LOD 0 root coordinate column
+		var factor = int(pow(2, job.lod_level))
 		base_coord = Vector3i(
-			coord.x >> job.lod_level,
-			coord.y >> job.lod_level,
-			coord.z >> job.lod_level
+			int(floor(float(coord.x) / factor)),
+			int(floor(float(coord.y) / factor)),
+			int(floor(float(coord.z) / factor))
 		)
 		
 	# FETCH CURRENT LIVE AUTHORIZATION LEVEL
 	var current_authorized_lod = authorized_lod_levels.get(base_coord, 0)
 	
-	# CRITICAL GUARD: If the player has already moved away and changed the authorized LOD level,
-	# or if this is a stale thread from an old LOD level configuration, discard it!
-	if job.lod_level != current_authorized_lod:
+	# Base chunks (LOD 0) must ALWAYS instantiate to hold their children!
+	if job.lod_level > current_authorized_lod:
 		if isDev:
 			print("Voxel Engine Thread Guard: Discarded STALE ghost thread at ", coord, " (Job LOD: ", job.lod_level, " | Current Live Authorized LOD: ", current_authorized_lod, ")")
+		
+		var stale_key = get_chunk_key(coord, job.lod_level)
+		if chunks.has(stale_key):
+			var stale_chunk = chunks[stale_key]
+			if is_instance_valid(stale_chunk):
+				stale_chunk.queue_free()
+			chunks.erase(stale_key)
 		return
 
 	var key = get_chunk_key(coord, job.lod_level)
 	
-	# 2. DUPLICATE GUARD: If a valid live chunk already exists here, don't overwrite it
+	# DUPLICATE GUARD
 	if chunks.has(key) and is_instance_valid(chunks[key]):
 		return
 
@@ -222,7 +229,14 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	chunk.current_lod = job.lod_level
 	chunk.chunk_coordinate = job.chunk_coordinate 
 	chunk.mat = chunk_material
-	chunk.chunk_size = chunk_size # Correct assignment requested in checklist
+	chunk.chunk_size = chunk_size 
+
+	# --VISIBILITY GUARD ---
+	# Force child chunks to stay hidden upon instantiation. 
+	# They will only become visible when `subdivision_complete` activates them!
+	if job.lod_level > 0:
+		chunk.deactivate()
+	# -----------------------------
 
 	add_child(chunk)
 	chunks[key] = chunk
@@ -237,11 +251,11 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 
 func process_chunk(chunk: Chunk) -> void:
 	# Lifecycle check safety guard
-	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
+	if not is_instance_valid(chunk) and chunk.is_queued_for_deletion():
 		return
 		
 	dirty_chunks_processed_this_frame += 1
-
+	
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
 
@@ -249,8 +263,8 @@ func process_chunk(chunk: Chunk) -> void:
 		if subdivision_controller and subdivision_controller.has_method("notify_chunk_mesh_ready"):
 			subdivision_controller.notify_chunk_mesh_ready(chunk)
 			
-	if chunk.collision_dirty:
-		collision_controller.rebuild(chunk)
+	#if chunk.collision_dirty:
+		#collision_controller.rebuild(chunk)
 		
 # ----------------------------
 # BACKGROUND THREAD EXECUTION BLOCK
@@ -270,7 +284,6 @@ func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 		dimensions.y,
 		random,
 		colors,
-		job.lod_level
 	)
 	
 	job.data = voxel_data
@@ -345,11 +358,6 @@ func _link_subdivision_hierarchy(
 		var parent_chunk: Chunk = chunks[parent_key]
 
 		child_chunk.parent_chunk = parent_chunk
-
-		parent_chunk.child_chunks = parent_chunk.child_chunks.filter(
-			func(c):
-				return is_instance_valid(c)
-		)
 
 		if not parent_chunk.child_chunks.has(child_chunk):
 			parent_chunk.child_chunks.append(child_chunk)

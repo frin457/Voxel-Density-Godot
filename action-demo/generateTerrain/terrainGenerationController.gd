@@ -1,4 +1,4 @@
-#./scripts/controllers/terrainGenerationController.gd
+#./generateTerrain/terrainGenerationController.gd
 class_name TerrainGenerationController extends RefCounted
 
 @export var terrainExponent = 1.5
@@ -9,8 +9,8 @@ func generate_data(
 	voxel_size: float,
 	max_world_height: float,
 	noise: Noise,
-	color_array: Array[Color],
-	lod_level: int = 0
+	color_array: Array[Color]
+	#lod_level: int = 0
 ) -> Dictionary:
 	var voxel_count = (
 		chunk_resolution

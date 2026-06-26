@@ -1,4 +1,4 @@
-#./scripts/chunk/chunk.gd
+#./scripts/lod/chunk/chunk.gd
 class_name Chunk extends StaticBody3D
 
 @export var mat: Material
@@ -79,10 +79,10 @@ func activate() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	
 	if meshInstance:		meshInstance.visible = true
-	if collisionShape:	collisionShape.shape.set_deferred("disabled",false)
+	if collisionShape:	collisionShape.set_deferred("disabled",false)
 
 
-func destroy_voxel(position) -> void:
+func destroy_voxel() -> void:
 	var index = get_1d_index(position.x,	position.y,	position.z)
 
 	if voxel_ids[index] == 0: return
@@ -95,7 +95,7 @@ func destroy_voxel(position) -> void:
 	#mark_lod_dirty()
 
 
-func restore_voxel(position) -> void:
+func restore_voxel() -> void:
 	var index = get_1d_index(position.x,position.y,position.z)
 
 	if original_voxel_ids[index] == 0: return
