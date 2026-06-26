@@ -19,8 +19,6 @@ var active := true
 var lod_level := 0       # structural depth
 var current_lod := 0     # active subdivision state
 
-var lod_dirty := false
-
 
 # ==================================================
 # PERFORMANCE & SURFACE CACHING
@@ -103,7 +101,6 @@ func destroy_voxel() -> void:
 	voxel_colors[index] = Color(0,0,0,0)
 	_update_surface_cache()
 	mark_dirty()
-	#mark_lod_dirty()
 
 
 func restore_voxel() -> void:
@@ -119,7 +116,6 @@ func restore_voxel() -> void:
 	
 	_update_surface_cache()
 	mark_dirty()
-	#mark_lod_dirty()
 
 func set_voxel_data(data: Dictionary) -> void:
 	voxel_ids = data["ids"].duplicate()
@@ -132,7 +128,6 @@ func set_voxel_data(data: Dictionary) -> void:
 
 	_update_surface_cache()
 	mark_dirty()
-	#mark_lod_dirty()
 
 func _update_surface_cache() -> void:
 	is_empty_air = true
@@ -183,15 +178,6 @@ func mark_dirty() -> void:
 
 	if manager and manager.has_method("queue_dirty_chunk"):
 		manager.queue_dirty_chunk(self)
-
-func mark_lod_dirty() -> void:
-	lod_dirty = true
-
-	if parent_chunk:
-		parent_chunk.mark_lod_dirty()
-
-func clear_lod_dirty() -> void:
-	lod_dirty = false
 
 func get_current_lod() -> int:
 	return current_lod

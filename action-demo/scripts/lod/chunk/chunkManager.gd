@@ -45,7 +45,6 @@ var authorized_lod_levels: Dictionary = {}
 
 # Initial generation state synchronization tracking
 var initial_generation_cooked: bool = false
-var tracking_initial_gen: bool = false
 
 # Active asynchronous thread tracking array
 var active_thread_tasks: Array[int] = []
@@ -199,10 +198,9 @@ func _process(_delta: float) -> void:
 		collision_controller.rebuild(chunk)
 		collision_updates_this_frame += 1
 			
-	if tracking_initial_gen and not initial_generation_cooked:
+	if not initial_generation_cooked:
 		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_queue.is_empty() and collision_queue.is_empty():
 			initial_generation_cooked = true
-			tracking_initial_gen = false
 		if isDev:
 			print("Voxel Engine: True Async generation empty. All background meshes live!")
 		generation_completed.emit()
@@ -310,10 +308,7 @@ func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 # BASELINE INITIALIZATION
 # ----------------------------
 func start_world_generation() -> void:
-	if isDev:
-		print("Voxel Engine: Generating initial base world map...")
 	
-	tracking_initial_gen = true
 	initial_generation_cooked = false
 	
 	authorized_lod_levels.clear()
