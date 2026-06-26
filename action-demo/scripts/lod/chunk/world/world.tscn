@@ -26,7 +26,6 @@ up_direction = Vector3(0, 0, 1)
 [node name="ChunkManager" type="Node" parent="." unique_id=772524256]
 script = ExtResource("3_882fi")
 isDev = true
-voxel_scale = 0.5
 chunk_size = 16
 dimensions = Vector3(64, 8, 64)
 chunk_material = SubResource("StandardMaterial3D_3h5nr")

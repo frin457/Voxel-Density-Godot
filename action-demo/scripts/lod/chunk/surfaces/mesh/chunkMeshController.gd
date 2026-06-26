@@ -17,13 +17,13 @@ func rebuild(chunk: Chunk) -> void:
 		var new_mesh = ArrayMesh.new()
 		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
 		chunk.meshInstance.mesh = new_mesh
-		chunk.collision_dirty = true
-		#chunk.manager.queue_collision_chunk(chunk)
+		if chunk.mat:
+			chunk.meshInstance.set_surface_override_material(0, chunk.mat)
+	else:
+		chunk.meshInstance.mesh = null
 		
-	if chunk.mat:
-		chunk.meshInstance.set_surface_override_material(0, chunk.mat)
 	chunk.mesh_dirty = false
-	
-#func queue_collision_chunk(chunk: Chunk) -> void:
-	#if chunk not in collision_queue:
-		#collision_queue.append(chunk)
+	chunk.collision_dirty = true
+
+	if chunk.manager:
+		chunk.manager.queue_collision_chunk(chunk)

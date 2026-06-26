@@ -1,6 +1,7 @@
 #./scripts/lod/chunk/chunk.gd
 class_name Chunk extends StaticBody3D
 
+var manager: ChunkManager
 @export var mat: Material
 @onready var collisionShape: CollisionShape3D = $CollisionShape3D
 @onready var meshInstance: MeshInstance3D = $MeshInstance3D
@@ -20,10 +21,6 @@ var active := true
 var lod_level := 0       # structural depth
 var current_lod := 0     # active subdivision state
 
-# TODO:
-# Currently unused.
-# Intended for upwards LOD invalidation (0->1->2)
-# example: terrain destruction modifies child chunks
 var lod_dirty := false
 
 
@@ -51,6 +48,11 @@ var voxel_size := 1.0
 var mesh_dirty := false
 var collision_dirty := false
 
+# --- Async Collision State ---
+var collision_cooking := false 
+var collision_stale := false 
+# -----------------------------
+
 var voxel_ids := PackedByteArray()
 var voxel_density := PackedByteArray()
 var voxel_colors := PackedColorArray()
@@ -69,8 +71,10 @@ func deactivate() -> void:
 	visible = false
 	process_mode = Node.PROCESS_MODE_DISABLED
 
-	if meshInstance:		meshInstance.visible = false
-	if collisionShape:	collisionShape.set_deferred("disabled", true)
+	if meshInstance:        
+		meshInstance.visible = false
+	if collisionShape:    
+		collisionShape.set_deferred("disabled", true)
 
 
 func activate() -> void:
@@ -78,8 +82,14 @@ func activate() -> void:
 	visible = true
 	process_mode = Node.PROCESS_MODE_INHERIT
 	
-	if meshInstance:		meshInstance.visible = true
-	if collisionShape:	collisionShape.set_deferred("disabled",false)
+	if meshInstance:        
+		meshInstance.visible = true
+	if collisionShape:    
+		# null assignment forces the Godot Physics Server to cleanly rebuild its broadphase 
+		# tracking bounds for this chunk, rather than utilizing stale data.
+		if not collision_dirty and collisionShape.shape == null:
+			mark_dirty() 
+		collisionShape.set_deferred("disabled", false)
 
 
 func destroy_voxel() -> void:
@@ -151,14 +161,19 @@ func _update_surface_cache() -> void:
 
 
 func mark_dirty() -> void:
-	var already_dirty = mesh_dirty or collision_dirty
+	var already_dirty = mesh_dirty and collision_dirty
 	if already_dirty:
-			return
+		return
+
 	mesh_dirty = true
 	collision_dirty = true
 	is_mesh_ready = false
 
-	var manager = get_parent()
+	# If a thread is currently cooking this chunk's collision, flag the result as stale
+	# so the main thread knows to discard the old thread result when it finishes.
+	if collision_cooking:
+		collision_stale = true
+
 	if manager and manager.has_method("queue_dirty_chunk"):
 		manager.queue_dirty_chunk(self)
 

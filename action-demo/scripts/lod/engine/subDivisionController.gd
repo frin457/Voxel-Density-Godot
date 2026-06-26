@@ -146,21 +146,24 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 	var parent_chunk = chunk.parent_chunk
 	if not is_instance_valid(parent_chunk):
 		return
-		
-	# Generate the exact key used to gate this parent's subdivision
+
 	var parent_key = manager.get_chunk_key(parent_chunk.chunk_coordinate, chunk.lod_level - 1)
-	
-	# If the parent key is missing from pending_subdivisions, a merge operation 
-	# has canceled this split. This child is a true asynchronous ghost thread.
+
+		# Only abort if the parent is NOT currently in the state we expected.
+		# If the parent has adopted the correct LOD, keep the child!
 	if not pending_subdivisions.has(parent_key):
+		# If the parent is already at the target level, this child is valid.
+		if parent_chunk.current_lod == chunk.lod_level:
+			return 
+			
 		if manager.isDev:
 			print("SubdivisionController: Aborting late-arrival child chunk at ", chunk.chunk_coordinate)
-		
+
 		var child_key = manager.get_chunk_key(chunk.chunk_coordinate, chunk.lod_level)
 		manager.chunks.erase(child_key)
 		chunk.queue_free()
 		return
-		
+	
 	var all_siblings_ready := true
 
 	if parent_chunk.child_chunks.size() < 8:
