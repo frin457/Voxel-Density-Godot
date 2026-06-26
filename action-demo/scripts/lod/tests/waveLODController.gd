@@ -10,6 +10,8 @@ class_name LODWaveController extends Node
 # ==========================================
 var target_lod_map := {}
 var requested_lod_map := {}
+# Track coords actively compiling their mesh
+var _active_batch_coords: Array[Vector3i] = []
 
 const MAX_UPGRADES_PER_FRAME = 4
 const MAX_DOWNGRADES_PER_FRAME = 8
@@ -55,7 +57,7 @@ func _process(_delta: float) -> void:
 		if not requested_lod_map.has(coord):
 			coords_to_evaluate.append(coord)
 
-	# 2. INTENTIONAL PROPAGATION ORDER
+	# PROPAGATION ORDER
 	# Sort sequentially by X, then Z, then Y to ensure a perfect sweeping line
 	coords_to_evaluate.sort_custom(func(a, b):
 		if a.x != b.x: return a.x < b.x
@@ -63,7 +65,7 @@ func _process(_delta: float) -> void:
 		return a.y < b.y
 	)
 
-	# 3. Dispatch Throttle
+	# Dispatching Throttle
 	var upgrades_dispatched = 0
 	var downgrades_dispatched = 0
 
@@ -72,13 +74,14 @@ func _process(_delta: float) -> void:
 		var base_chunk = manager.chunks[key] as Chunk
 		var desired_lod = target_lod_map[chunk_coord]
 		var current_lod = base_chunk.get_current_lod()
-
+		
 		# Dispatch Upgrades (Split)
 		if desired_lod > current_lod:
 			var next_lod = current_lod + 1
-			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue
-			if upgrades_dispatched >= MAX_UPGRADES_PER_FRAME: continue
-				
+			
+			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue #map completed, skip
+			if upgrades_dispatched >= MAX_UPGRADES_PER_FRAME: continue #batch count, skip
+			#otherwise upgrade chunk
 			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod)
 			upgrades_dispatched += 1
 			requested_lod_map[chunk_coord] = next_lod
@@ -96,7 +99,7 @@ func _process(_delta: float) -> void:
 			manager.set_authorized_lod(chunk_coord, next_lod)
 
 # ==========================================
-# WAVE TIMELINE SEQUENCER
+# WAVE-PATTERN TIMELINE SEQUENCE
 # ==========================================
 func _run_wave_demonstration() -> void:
 	print("Wave Engine: Waiting for initial background generation to completely cook...")
@@ -105,7 +108,7 @@ func _run_wave_demonstration() -> void:
 		await get_tree().process_frame
 		
 	var world_size_size = manager.get_chunk_world_size()
-	total_x = int(ceil(manager.dimensions.x / world_size_size))
+	var total_x = int(ceil(manager.dimensions.x / world_size_size))
 	var total_z = int(ceil(manager.dimensions.z / world_size_size))
 	var total_y = int(ceil(manager.dimensions.y / world_size_size))
 	
@@ -117,10 +120,10 @@ func _run_wave_demonstration() -> void:
 				target_wave_surface.append(surface_coord)
 				target_lod_map[surface_coord] = 0
 				
-	print("Wave Engine: Map ready! Caching baseline wave coordinates...")
+	print("Wave Test: Map ready! Caching baseline wave coordinates...")
 	await get_tree().create_timer(0.1).timeout
 	while true:
-		print("Wave Engine: ---> Dispatching Sorted Split Front (LOD 1) <---")
+		print("Wave Test: ---> Dispatching Sorted Split Front (LOD 1) <---")
 		for current_x in range(total_x):
 			var advanced = false
 			for coord in target_wave_surface:
@@ -130,13 +133,11 @@ func _run_wave_demonstration() -> void:
 			if advanced:
 				await get_tree().create_timer(wave_speed).timeout
 			
-		print("Wave Engine: Split requested. Waiting for ALL pipelines (Mesh + Collision) to clear...")
-		await _wait(true)
 			
-		print("Wave Engine: Split wave fully rendered! Holding peak layout...")
+		print("Wave Test: Split wave fully rendered! Holding peak layout...")
 		await get_tree().create_timer(wave_gap_delay).timeout
 		
-		print("Wave Engine: ---> Dispatching Collapse Front (LOD 0) <---")
+		print("Wave Test: ---> Dispatching Collapse Front (LOD 0) <---")
 		for current_x in range(total_x):
 			var advanced = false
 			for coord in target_wave_surface:
@@ -146,10 +147,8 @@ func _run_wave_demonstration() -> void:
 			if advanced:
 				await get_tree().create_timer(wave_speed).timeout
 			
-		print("Wave Engine: Collapse requested. Waiting for pipelines...")
-		await _wait(true)
 			
-		print("Wave Engine: Collapse wave fully rendered! Resetting cycle...")
+		print("Wave Test: Collapse wave fully rendered! Resetting cycle...")
 		await get_tree().create_timer(wave_gap_delay * 2.0).timeout
 
 # ==========================================
@@ -199,6 +198,13 @@ func parent_quadrant_has_surfaces(parent_chunk: Chunk, local_offset: Vector3i) -
 		return parent_chunk.sub_quadrant_has_surfaces.get(local_offset, true)
 	return true
 
+func _dispatch_batch(coords: Array, target_lod: int) -> void:
+	for coord in coords:
+		target_lod_map[coord] = target_lod
+		manager.set_authorized_lod(coord, target_lod)
+		# Assuming you have a way to identify these specific jobs
+		#	_track_pending_batch(coord)
+		
 func _find_top_surface_chunk(x: int, z: int, max_y: int) -> Vector3i:
 	for y in range(max_y - 1, -1, -1):
 		var test_coord = Vector3i(x, y, z)
@@ -206,20 +212,3 @@ func _find_top_surface_chunk(x: int, z: int, max_y: int) -> Vector3i:
 		if manager.chunks.has(key):
 			return test_coord
 	return Vector3i(-1, -1, -1)
-
-func _wait(skip_collision_check: bool = false) -> void:
-	while true:
-		var generation_busy = not manager.job_queue.is_empty() or manager.active_thread_tasks.size() > 0
-		var mesh_busy = manager.dirty_queue.size() > 0
-		var collision_busy = manager.collision_queue.size() > 0 
-		
-		# Only block if mesh/gen is busy. If ONLY collisions are busy, proceed!
-		var is_busy = generation_busy or mesh_busy
-		if not skip_collision_check:
-			is_busy = is_busy or collision_busy
-
-		if not is_busy:
-			await get_tree().process_frame
-			break
-
-		await get_tree().process_frame

@@ -3,9 +3,6 @@ class_name PlayerLODController extends Node
 
 @onready var manager: ChunkManager = $".."
 
-@export var movement_threshold: float = 2
-@export var rotation_threshold_degrees: float = 5
-
 var last_chunk_coordinate := Vector3i(999999, 999999, 999999)
 var last_player_position = Vector3.ZERO
 var last_player_rotation = Vector3.ZERO
@@ -13,8 +10,8 @@ var last_player_rotation = Vector3.ZERO
 var requested_lod_map := {} 
 var prev_lod_map := {}
 
-const MAX_UPGRADES_PER_FRAME = 4
-const MAX_DOWNGRADES_PER_FRAME = 8 
+const MAX_UPGRADES_PER_FRAME = 8
+const MAX_DOWNGRADES_PER_FRAME = 16	
 
 func _ready() -> void:
 	if not manager:
@@ -38,21 +35,17 @@ func _process(_delta: float) -> void:
 		floor(current_pos.y / chunk_world_size),
 		floor(current_pos.z / chunk_world_size)
 	)
-	# Threshold check
-	var moved = current_pos.distance_to(last_player_position) > movement_threshold
-	var rotated = current_rot.distance_to(last_player_rotation) > rotation_threshold_degrees
 	
-	if moved or rotated:
 		# Update globals
-		last_player_position = current_pos
-		last_player_rotation = current_rot
-		last_chunk_coordinate = center_coord
-		update_lod(camera)
+	last_player_position = current_pos
+	last_player_rotation = current_rot
+	last_chunk_coordinate = center_coord
+	update_lod(camera)
 		
 func update_lod(camera: Camera3D) -> void:
 	var player_pos = last_player_position
-	var chunk_world_size = manager.get_chunk_world_size()
 	var center_coord = last_chunk_coordinate    
+	var chunk_world_size = manager.get_chunk_world_size()
 	var camera_forward = -camera.global_transform.basis.z.normalized()
 	var target_lod_map = {}
 

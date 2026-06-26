@@ -16,7 +16,6 @@ var mesh_controller := ChunkMeshController.new()
 var collision_controller := CollisionController.new()
 # Controllers initialized in _ready()
 var subdivision_controller: SubdivisionController
-var query_controller: QueryController
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -49,11 +48,13 @@ var initial_generation_cooked: bool = false
 # Active asynchronous thread tracking array
 var active_thread_tasks: Array[int] = []
 
-# Decoupled entry points for ANY external script
+# Entry points for ANY external script 
+# TODO: Review these signals pattern	
 signal subdivision_requested(coord: Vector3i, target_level: int, wave_index: int)
 signal merge_requested(coord: Vector3i)
 signal generation_requested()
 signal generation_completed()
+signal chunk_mesh_finished(coord: Vector3i)
 
 var dirty_queue_processed_this_frame := 0
 var random := FastNoiseLite.new()
@@ -78,7 +79,6 @@ func get_authorized_lod(base_coord: Vector3i) -> int:
 # ----------------------------
 func _ready() -> void:
 	# Explicitly assign controllers first
-	query_controller = QueryController.new(self)
 	subdivision_controller = SubdivisionController.new(self)
 	
 	# Connect signals directly to controller methods to bypass lambda execution delays
@@ -210,13 +210,11 @@ func process_chunk(chunk: Chunk) -> void:
 	# Safe short-circuit validation check
 	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
 		return
-		
 	dirty_queue_processed_this_frame += 1
-	
 	# Run the meshing controller pass
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
-
+		chunk_mesh_finished.emit(chunk.chunk_coordinate)
 
 func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	var coord = job.chunk_coordinate

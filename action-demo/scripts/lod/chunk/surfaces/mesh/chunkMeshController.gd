@@ -10,7 +10,7 @@ func rebuild(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
 		return
 	#var collision_queue = chunk.manager.collision_queue	
-	# Execute whatever strategy is currently slotted in
+	# Execute current meshing strategy
 	var surface_arrays = active_mesher.generate_mesh_data(chunk)
 		
 	if surface_arrays.size() > 0 and surface_arrays[Mesh.ARRAY_VERTEX] != null:

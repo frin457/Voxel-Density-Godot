@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://b4s5tiunt7gfn" path="res://scripts/lod/chunk/world/world.gd" id="1_882fi"]
 [ext_resource type="PackedScene" uid="uid://co68l2ekwhii8" path="res://controller/unit/player.tscn" id="2_3h5nr"]
 [ext_resource type="Script" uid="uid://cchlfslsnl51m" path="res://scripts/lod/chunk/chunkManager.gd" id="3_882fi"]
-[ext_resource type="Script" uid="uid://dqreyv0s206ht" path="res://scripts/lod/tests/waveLODController.gd" id="4_tp7ox"]
+[ext_resource type="Script" uid="uid://c88apb3ttnttf" path="res://scripts/lod/tests/playerLODController.gd" id="4_3h5nr"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3h5nr"]
 shading_mode = 0
@@ -29,7 +29,7 @@ isDev = true
 chunk_size = 16
 dimensions = Vector3(128, 16, 128)
 chunk_material = SubResource("StandardMaterial3D_3h5nr")
+colors = Array[Color]([Color(0.19215687, 0.09411765, 0, 1), Color(0.11372549, 0.23529412, 0.07450981, 0.9843137), Color(0.11372549, 0.11764706, 0.07450981, 1), Color(0, 0.50980395, 0, 1)])
 
-[node name="Lod" type="Node" parent="ChunkManager" unique_id=1359254117 node_paths=PackedStringArray("manager")]
-script = ExtResource("4_tp7ox")
-manager = NodePath("..")
+[node name="Lod" type="Node" parent="ChunkManager" unique_id=1359254117]
+script = ExtResource("4_3h5nr")

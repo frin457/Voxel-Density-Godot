@@ -3,21 +3,12 @@ class_name SubdivisionController extends RefCounted
 
 var manager: ChunkManager
 
-# Gating variables to stop frame-by-frame floods
-var last_evaluation_position := Vector3(INF, INF, INF)
-@export var evaluation_threshold_meters := 2.0 
-
-# Hysteresis offsets to stop oscillation at the boundaries
-@export var subdivision_radius := 32.0
-@export var merge_radius := 40.0 
-
 # Track what is currently processing to reject duplicate request floods
 var pending_subdivisions := {}
 var pending_merges := {}
 
 func _init(_manager: ChunkManager) -> void:
 	manager = _manager
-
 
 func request_subdivision(coord: Vector3i, target_level: int) -> void:
 	var key = manager.get_chunk_key(coord, target_level - 1)
