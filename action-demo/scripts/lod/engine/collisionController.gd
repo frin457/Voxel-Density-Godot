@@ -19,14 +19,12 @@ func rebuild(chunk: Chunk) -> void:
 		chunk.collision_dirty = false
 		return
 		
-	# 2. Extract the visual triangle faces and bake a precise static trimesh shape
+	# 2. Extract Faces and bake a trimesh shape
 	var faces = mesh_instance.mesh.get_faces()
 	if faces.size() > 0:
-		var trimesh_shape := ConcavePolygonShape3D.new()
-		trimesh_shape.set_faces(faces)
-		collision_shape.shape = trimesh_shape
-	else:
-		collision_shape.shape = null
+		var shape := ConcavePolygonShape3D.new()
+		shape.set_faces(faces)
+		collision_shape.shape = shape
 		
 	# Clear the dirty flag so the manager stops querying it
 	chunk.collision_dirty = false

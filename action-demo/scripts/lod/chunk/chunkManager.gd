@@ -29,8 +29,11 @@ var query_controller: QueryController
 
 # Job / update systems
 var job_queue := ChunkJobQueue.new()
-var dirty_chunks: Array[Chunk] = []
-@export var max_dirty_chunks_per_frame := 4
+var dirty_queue: Array[Chunk] = []
+
+@export var max_dirty_queue_per_frame := 4
+@export var max_collision_updates_per_frame := 2
+var collision_updates_this_frame := 0
 
 # World state - Accepts compound keys or Vector4i equivalent strings
 var chunks: Dictionary = {}
@@ -52,7 +55,7 @@ signal merge_requested(coord: Vector3i)
 signal generation_requested()
 signal generation_completed()
 
-var dirty_chunks_processed_this_frame := 0
+var dirty_queue_processed_this_frame := 0
 var random := FastNoiseLite.new()
 var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
 
@@ -124,6 +127,7 @@ func _sanitize_world_settings() -> void:
 	)
 
 func _process(_delta: float) -> void:
+	collision_updates_this_frame = 0
 	job_queue.flush()
 
 	while job_queue.queue.size() > 0 and active_thread_tasks.size() < workerCount:
@@ -149,9 +153,9 @@ func _process(_delta: float) -> void:
 	if isDev and Engine.get_frames_drawn() % 120 == 0:
 		print(
 			"Dirty:",
-			dirty_chunks.size(),
+			dirty_queue.size(),
 			" Processed:",
-			dirty_chunks_processed_this_frame,
+			dirty_queue_processed_this_frame,
 			" Active Threads:",
 			active_thread_tasks.size()
 		)
@@ -160,24 +164,24 @@ func _process(_delta: float) -> void:
 	var max_allowed_budget_usec := 2000 
 	
 	# Reset debug counter every single frame
-	dirty_chunks_processed_this_frame = 0
+	dirty_queue_processed_this_frame = 0
 	
 	# Queue Backlog Threshold Alert Warning
-	if dirty_chunks.size() > 128 and isDev:
-		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Current count: ", dirty_chunks.size())
+	if dirty_queue.size() > 128 and isDev:
+		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Current count: ", dirty_queue.size())
 
-	#while dirty_chunks.size() > 0:
-	for m in range(min(dirty_chunks.size(), 128)):
+	#while dirty_queue.size() > 0:
+	for m in range(min(dirty_queue.size(), 128)):
 		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
 			break 
 			
-		var chunk = dirty_chunks.pop_front()
+		var chunk = dirty_queue.pop_front()
 		# Add deletion guard check before processing
 		if is_instance_valid(chunk) and not chunk.is_queued_for_deletion():
 			process_chunk(chunk)
 
 	if tracking_initial_gen and not initial_generation_cooked:
-		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_chunks.is_empty():
+		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_queue.is_empty():
 			initial_generation_cooked = true
 			tracking_initial_gen = false
 			if isDev:
@@ -254,7 +258,7 @@ func process_chunk(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk) and chunk.is_queued_for_deletion():
 		return
 		
-	dirty_chunks_processed_this_frame += 1
+	dirty_queue_processed_this_frame += 1
 	
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
@@ -263,9 +267,12 @@ func process_chunk(chunk: Chunk) -> void:
 		if subdivision_controller and subdivision_controller.has_method("notify_chunk_mesh_ready"):
 			subdivision_controller.notify_chunk_mesh_ready(chunk)
 			
-	#if chunk.collision_dirty:
-		#collision_controller.rebuild(chunk)
-		
+	if (	chunk.collision_dirty and 
+		collision_updates_this_frame < max_collision_updates_per_frame
+	):
+		collision_controller.rebuild(chunk)
+		collision_updates_this_frame += 1
+
 # ----------------------------
 # BACKGROUND THREAD EXECUTION BLOCK
 # ----------------------------
@@ -368,10 +375,10 @@ func queue_dirty_chunk(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
 		return
 
-	if chunk in dirty_chunks:
+	if chunk in dirty_queue:
 		return
 
-	dirty_chunks.append(chunk)
+	dirty_queue.append(chunk)
 
 
 # ----------------------------
