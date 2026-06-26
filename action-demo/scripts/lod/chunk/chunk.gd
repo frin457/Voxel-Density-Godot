@@ -6,8 +6,6 @@ var manager: ChunkManager
 @onready var collisionShape: CollisionShape3D = $CollisionShape3D
 @onready var meshInstance: MeshInstance3D = $MeshInstance3D
 
-var current_meshing_index := 0
-
 var pending_vertices := PackedVector3Array()
 var pending_indices := PackedInt32Array()
 var pending_normals := PackedVector3Array()
@@ -27,7 +25,9 @@ var lod_dirty := false
 # ==================================================
 # PERFORMANCE & SURFACE CACHING
 # ==================================================
-@export var chunk_size: int = 32
+@export var chunk_size:= 32
+var chunk_size_sq := 1024
+var current_meshing_index := 0
 
 var is_empty_air := true
 var is_mesh_ready := false
@@ -62,6 +62,7 @@ var original_voxel_density := PackedByteArray()
 var original_voxel_colors := PackedColorArray()
 
 func _ready() -> void:
+	chunk_size_sq = chunk_size * chunk_size
 	if meshInstance and not meshInstance.mesh:
 		meshInstance.mesh = ArrayMesh.new()
 
@@ -93,7 +94,7 @@ func activate() -> void:
 
 
 func destroy_voxel() -> void:
-	var index = get_1d_index(position.x,	position.y,	position.z)
+	var index = chunk_coordinate.x + chunk_coordinate.y * chunk_size + chunk_coordinate.z * chunk_size_sq
 
 	if voxel_ids[index] == 0: return
 
@@ -106,7 +107,7 @@ func destroy_voxel() -> void:
 
 
 func restore_voxel() -> void:
-	var index = get_1d_index(position.x,position.y,position.z)
+	var index = chunk_coordinate.x + chunk_coordinate.y * chunk_size + chunk_coordinate.z * chunk_size_sq
 
 	if original_voxel_ids[index] == 0: return
 
@@ -140,11 +141,17 @@ func _update_surface_cache() -> void:
 		sub_quadrant_has_surfaces[k] = false
 
 	var half_size = float(chunk_size) * 0.5
+	var size = chunk_size
+	var size_sq = size * size
 
-	for z in range(chunk_size):
-		for y in range(chunk_size):
-			for x in range(chunk_size):
-				var index = get_1d_index(x, y, z)
+	for z in range(size):
+		var z_offset = z * size_sq
+
+		for y in range(size):
+			var y_offset = y * size
+
+			for x in range(size):
+				var index = ( x + y_offset + z_offset )
 
 				if voxel_ids[index] == 0:
 					continue
@@ -194,7 +201,7 @@ func get_1d_index(x: int, y: int, z: int) -> int:
 	return (
 		x +
 		(y * chunk_size) +
-		(z * chunk_size * chunk_size)
+		(z * chunk_size_sq)
 	)
 
 

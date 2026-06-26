@@ -15,8 +15,11 @@ func generate_mesh_data(chunk: Chunk) -> Array:
 	var indices := PackedInt32Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
-
+	
 	var chunk_size = chunk.chunk_size
+	var chunk_size_sq = chunk_size * chunk_size
+	var voxel_ids = chunk.voxel_ids
+	var voxel_colors = chunk.voxel_colors
 	var voxel_scale = chunk.voxel_size
 
 	# Sweep over both back/front passes (b) across all 3 dimensions (d)
@@ -31,7 +34,7 @@ func generate_mesh_data(chunk: Chunk) -> Array:
 
 			# Allocate a 1D slice mask for the 2D sweep plane
 			var mask: Array[int] = []
-			mask.resize(chunk_size * chunk_size)
+			mask.resize(chunk_size_sq)
 
 			pos[d] = -1
 			while pos[d] < chunk_size:
@@ -43,11 +46,27 @@ func generate_mesh_data(chunk: Chunk) -> Array:
 					while pos[u] < chunk_size:
 						var current_id = 0
 						var compare_id = 0
-
-						if pos[d] >= 0:
-							current_id = chunk.voxel_ids[chunk.get_1d_index(pos.x, pos.y, pos.z)]
+					
 						if pos[d] < chunk_size - 1:
-							compare_id = chunk.voxel_ids[chunk.get_1d_index(pos.x + q.x, pos.y + q.y, pos.z + q.z)]
+							var nx = pos.x + q.x
+							var ny = pos.y + q.y
+							var nz = pos.z + q.z
+
+							var compare_index = nx + (ny * chunk_size) + (nz * chunk_size_sq)
+							if compare_index < 0 or compare_index >= voxel_ids.size():
+								push_error(
+							        "Bad compare index: %d (%d,%d,%d)"
+									% [compare_index, nx, ny, nz]
+								)	
+							
+							if pos[d] >= 0:
+								current_id = voxel_ids[(
+									pos.x + 
+									pos.y * chunk_size + 
+									pos.z * chunk_size_sq
+								
+								)]
+							compare_id = voxel_ids[compare_index]
 
 						# Cull internal face matches; assign voxel ID to mask if exposed
 						if b == 0:
@@ -68,7 +87,7 @@ func generate_mesh_data(chunk: Chunk) -> Array:
 				pos[d] += 1
 				mask_index = 0
 
-				# --- STEP 2: GREEDY COMBINE QUAD MESHES ---
+				# FORM QUAD MESHES
 				for j in range(chunk_size):
 					var i = 0
 					while i < chunk_size:
@@ -109,6 +128,7 @@ func generate_mesh_data(chunk: Chunk) -> Array:
 						var sample_x = int(local_pos.x)
 						var sample_y = int(local_pos.y)
 						var sample_z = int(local_pos.z)
+
 						# If b == 1 (Front/Right/Top), the face belongs to the voxel *behind* the cursor.
 						# If b == 0 (Back/Left/Bottom), the face belongs to the voxel *ahead* of the cursor.
 						if b == 1:
@@ -125,10 +145,15 @@ func generate_mesh_data(chunk: Chunk) -> Array:
 						sample_y = clampi(sample_y, 0, chunk_size - 1)
 						sample_z = clampi(sample_z, 0, chunk_size - 1)
 						
-						var face_color = chunk.voxel_colors[chunk.get_1d_index(sample_x, sample_y, sample_z)]
+						var sample_index = (
+								sample_x +
+								(sample_y * chunk_size) +
+								(sample_z * chunk_size_sq)
+							)
+						var face_color = voxel_colors[sample_index]
 						var normal_vector = FACE_NORMALS[(d * 2) + b]
 
-						# --- STEP 3: APPEND QUAD TO DATA ARRAYS ---
+						# APPEND QUAD to data arrays
 						var start_v_idx = vertices.size()
 
 						# Quad corners scaled out to the world sizing mesh bounds

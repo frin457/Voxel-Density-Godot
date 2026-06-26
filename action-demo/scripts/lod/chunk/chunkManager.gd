@@ -218,10 +218,6 @@ func process_chunk(chunk: Chunk) -> void:
 	# Run the meshing controller pass
 	if chunk.mesh_dirty:
 		mesh_controller.rebuild(chunk)
-	
-	# Route to collision sorting step
-	if chunk.collision_dirty:
-		queue_collision_chunk(chunk)
 
 
 func _main_thread_instantiate_chunk(job: ChunkJob) -> void:

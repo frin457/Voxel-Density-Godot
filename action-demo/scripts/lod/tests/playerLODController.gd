@@ -3,8 +3,8 @@ class_name PlayerLODController extends Node
 
 @onready var manager: ChunkManager = $".."
 
-@export var movement_threshold: float = 5
-@export var rotation_threshold_degrees: float = 25.0
+@export var movement_threshold: float = 2
+@export var rotation_threshold_degrees: float = 5
 
 var last_chunk_coordinate := Vector3i(999999, 999999, 999999)
 var last_player_position = Vector3.ZERO
