@@ -107,7 +107,7 @@ func _run_wave_demonstration() -> void:
 	while not manager.initial_generation_cooked:
 		await get_tree().process_frame
 		
-	var world_chunk_size = manager.world_chunk_size
+	var world_chunk_size = manager.chunk_lod_size
 	var total_x = int(ceil(manager.dimensions.x / world_chunk_size))
 	var total_z = int(ceil(manager.dimensions.z / world_chunk_size))
 	var total_y = int(ceil(manager.dimensions.y / world_chunk_size))

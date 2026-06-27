@@ -27,7 +27,7 @@ up_direction = Vector3(0, 0, 1)
 script = ExtResource("3_882fi")
 isDev = true
 workerCount = 8
-dimensions = Vector3(64, 8, 64)
+dimensions = Vector3(96, 8, 96)
 chunk_material = SubResource("StandardMaterial3D_3h5nr")
 colors = Array[Color]([Color(0.19215687, 0.09411765, 0, 1), Color(0.11372549, 0.23529412, 0.07450981, 0.9843137), Color(0.11372549, 0.11764706, 0.07450981, 1), Color(0, 0.50980395, 0, 1)])
 
