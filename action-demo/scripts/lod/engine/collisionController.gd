@@ -31,7 +31,7 @@ func rebuild(chunk: Chunk) -> void:
 		
 		# Dispatch heavy generation a worker
 		WorkerThreadPool.add_task(
-			_cook_collision_shape.bind(chunk, faces), 
+			_cook_collision_shape.bind(chunk.get_instance_id(), faces), 
 			true, 
             "CollisionCookTask"
 		)
@@ -40,17 +40,19 @@ func rebuild(chunk: Chunk) -> void:
 
 
 # Executes on Background Worker Thread
-func _cook_collision_shape(chunk: Chunk, faces: PackedVector3Array) -> void:
+func _cook_collision_shape(chunk_id: int, faces: PackedVector3Array) -> void:
 	var shape := ConcavePolygonShape3D.new()
 	# set_faces() triggers the rebuild
 	shape.set_faces(faces)
 	
 	# Safely pass the cooked shape back to the main thread
-	_apply_collision.call_deferred(chunk, shape)
-
+	_apply_collision.call_deferred(chunk_id, shape)
 
 # Executes on Main Thread via call_deferred
-func _apply_collision(chunk: Chunk, shape: ConcavePolygonShape3D) -> void:
+func _apply_collision(chunk_id: int, shape: ConcavePolygonShape3D) -> void:
+	var chunk: Chunk = instance_from_id(chunk_id) as Chunk
+	
+	# If the chunk was freed while we were cooking, it will be null here. Safe exit!
 	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
 		return
 		

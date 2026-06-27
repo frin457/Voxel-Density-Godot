@@ -1,31 +1,81 @@
-#./scripts/lod/chunk/surfaces/mesh/chunkMeshController.gd
 class_name ChunkMeshController extends RefCounted
 
-## The active meshing strategy. Can be rotated at runtime!
 var active_mesher: BaseMesher = StandardMesher.new()
 #var active_mesher: BaseMesher = GreedyMesher.new()
 
-## Entry point invoked by ChunkManager during the dirty chunk processing queue loop
+
 func rebuild(chunk: Chunk) -> void:
-	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
+	if !is_instance_valid(chunk):
 		return
-	#var collision_queue = chunk.manager.collision_queue	
-	# Execute current meshing strategy
-	var surface_arrays = active_mesher.generate_mesh_data(chunk)
+
+	if chunk.mesh_cooking:
+		chunk.mesh_stale = true
+		return
+
+	chunk.mesh_cooking = true
+
+	var snapshot := MeshSnapshot.new()
+
+	snapshot.voxel_ids = chunk.voxel_ids.duplicate()
+	snapshot.voxel_colors = chunk.voxel_colors.duplicate()
+	snapshot.chunk_size = chunk.chunk_size
+	snapshot.chunk_size_sq = chunk.chunk_size_sq
+	snapshot.voxel_scale = chunk.voxel_size
+
+	WorkerThreadPool.add_task(
+		_generate_mesh.bind(chunk, snapshot),
+		true,
+		"Mesh_%s" % chunk.chunk_coordinate
+	)
+
+
+func _generate_mesh(
+	chunk: Chunk,
+	snapshot: MeshSnapshot
+) -> void:
+
+	if !is_instance_valid(chunk):
+		return
+	var arrays = active_mesher.generate_mesh_data(snapshot)
+	if !is_instance_valid(chunk):
+		return
 		
-	if surface_arrays.size() > 0 and surface_arrays[Mesh.ARRAY_VERTEX] != null:
+	#The main thread might have called queue_free() on this chunk 
+	# while the line above was calculating.
+	chunk.pending_surface_arrays = arrays
+	chunk._mesh_complete.call_deferred()
+
+
+func apply_mesh(chunk: Chunk) -> void:
+	if !is_instance_valid(chunk):
+		return
+
+	var surface_arrays = chunk.pending_surface_arrays
+
+	if (
+		surface_arrays.size() > 0 and
+		surface_arrays[Mesh.ARRAY_VERTEX] != null
+	):
 		var new_mesh = ArrayMesh.new()
-		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
+
+		new_mesh.add_surface_from_arrays(
+			Mesh.PRIMITIVE_TRIANGLES,
+			surface_arrays
+		)
+
 		chunk.meshInstance.mesh = new_mesh
+
 		if chunk.mat:
-			chunk.meshInstance.set_surface_override_material(0, chunk.mat)
+			chunk.meshInstance.set_surface_override_material(
+				0,
+				chunk.mat
+			)
 	else:
 		chunk.meshInstance.mesh = null
-		
+
 	chunk.mesh_dirty = false
 	chunk.collision_dirty = true
 
 	if chunk.manager:
 		chunk.manager.queue_collision_chunk(chunk)
-		#chunk.manager._create_chunk_wireframe_bounds(chunk)
-		
+		chunk.manager._create_chunk_wireframe_bounds(chunk)

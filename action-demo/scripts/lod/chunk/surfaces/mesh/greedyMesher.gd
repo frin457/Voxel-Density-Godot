@@ -10,18 +10,19 @@ const FACE_NORMALS = [
 	Vector3(0, 0, 1)   # d=2, b=1 (Front)
 ]
 
-func generate_mesh_data(chunk: Chunk) -> Array:
+func generate_mesh_data(data: MeshSnapshot) -> Array:
 	var vertices := PackedVector3Array()
 	var indices := PackedInt32Array()
 	var normals := PackedVector3Array()
 	var colors := PackedColorArray()
-	
-	var chunk_size = chunk.chunk_size
-	var chunk_size_sq = chunk_size * chunk_size
-	var voxel_ids = chunk.voxel_ids
-	var voxel_colors = chunk.voxel_colors
-	var voxel_scale = chunk.voxel_size
 
+	var chunk_size = data.chunk_size
+	var chunk_size_sq = data.chunk_size_sq
+
+	var voxel_ids = data.voxel_ids
+	var voxel_colors = data.voxel_colors
+	var voxel_scale = data.voxel_scale
+	
 	# Sweep over both back/front passes (b) across all 3 dimensions (d)
 	for b in range(2):
 		for d in range(3):
@@ -54,10 +55,10 @@ func generate_mesh_data(chunk: Chunk) -> Array:
 
 							var compare_index = nx + (ny * chunk_size) + (nz * chunk_size_sq)
 							if compare_index < 0 or compare_index >= voxel_ids.size():
-								push_error(
-							        "Bad compare index: %d (%d,%d,%d)"
-									% [compare_index, nx, ny, nz]
-								)	
+								mask[mask_index] = 0
+								mask_index += 1
+								pos[u] += 1
+								continue
 							
 							if pos[d] >= 0:
 								current_id = voxel_ids[(
