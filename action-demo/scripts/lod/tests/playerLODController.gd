@@ -3,18 +3,16 @@ class_name PlayerLODController extends Node
 
 @onready var manager: ChunkManager = $".."
 
-@export var movement_threshold: float = 2.0
-@export var rotation_threshold_degrees: float = 25.0
-
-var last_chunk_coordinate := Vector3i(999999.0, 999999.0, 999999.0)
+var chunk_lod_size := 16
+var last_chunk_coordinate := Vector3i(999999, 999999, 999999)
 var last_player_position = Vector3.ZERO
 var last_player_rotation = Vector3.ZERO
 
 var requested_lod_map := {} 
 var prev_lod_map := {}
 
-const MAX_UPGRADES_PER_FRAME = 4
-const MAX_DOWNGRADES_PER_FRAME = 8 
+const MAX_UPGRADES_PER_FRAME = 8
+const MAX_DOWNGRADES_PER_FRAME = 16	
 
 func _ready() -> void:
 	if not manager:
@@ -24,76 +22,62 @@ func _ready() -> void:
 			
 	if not manager:
 		push_error("PlayerLODController Error: Cannot find ChunkManager!")
-
+	chunk_lod_size = manager.chunk_lod_size 
 func _process(_delta: float) -> void:
 	var camera = get_viewport().get_camera_3d()
 	if not camera: return
 	
 	var current_pos = camera.global_position
 	var current_rot = camera.global_rotation_degrees
-	var chunk_world_size = manager.get_chunk_world_size()
 	
-	var center_coord = Vector3(
-		floor(current_pos.x / chunk_world_size),
-		floor(current_pos.y / chunk_world_size),
-		floor(current_pos.z / chunk_world_size)
+	var center_coord = Vector3i(
+		floor(current_pos.x / chunk_lod_size),
+		floor(current_pos.y / chunk_lod_size),
+		floor(current_pos.z / chunk_lod_size)
 	)
-	# Threshold check
-	var moved = current_pos.distance_to(last_player_position) > movement_threshold
-	var rotated = current_rot.distance_to(last_player_rotation) > rotation_threshold_degrees
 	
-	if moved or rotated:
 		# Update globals
-		last_player_position = current_pos
-		last_player_rotation = current_rot
-		last_chunk_coordinate = center_coord
-		update_lod(camera)
+	last_player_position = current_pos
+	last_player_rotation = current_rot
+	last_chunk_coordinate = center_coord
+	update_lod(camera)
 		
 func update_lod(camera: Camera3D) -> void:
-
 	var player_pos = last_player_position
-	var chunk_world_size = manager.get_chunk_world_size()
-	var center_coord = last_chunk_coordinate	
+	var center_coord = last_chunk_coordinate    
 	var camera_forward = -camera.global_transform.basis.z.normalized()
 	var target_lod_map = {}
 
-	# Active Chunks
-	const rangeMin = -2
-	const rangeMax = 3
+	const rangeMin = -3
+	const rangeMax = 4
 	const buffer = 1
-	# 0.0 is exactly 90 degrees (flat plane to the camera). 
-	# -0.2 gives "peripheral vision" so chunks don't pop in at the edges.
-	const visibility_threshold = .5
+	const visibility_threshold = -0.2
 	
 	for x in range(rangeMin, rangeMax):
 		for z in range(rangeMin, rangeMax):
 			for y in range(rangeMin, rangeMax): 
 				var offset_coord = center_coord + Vector3i(x, y, z)
 
-				# Center buffer MUST remain loaded (prevents falling through the floor)
+				# Camera always gets high detail
 				if abs(x) <= buffer and abs(y) <= buffer and abs(z) <= buffer:
 					target_lod_map[offset_coord] = 2
 					continue
 				
-				# Find the center of the target chunk in world space
-				var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
+				# Determine visibility
+				var chunk_center_world = Vector3(offset_coord) * chunk_lod_size + Vector3(chunk_lod_size, chunk_lod_size, chunk_lod_size) * 0.5
 				var dir_to_chunk = (chunk_center_world - player_pos).normalized()
-				
-				# Check if chunk is within camera fov
 				var dot_product = camera_forward.dot(dir_to_chunk)
 				
+				# If chunk is behind us, set to lower LOD (1), but KEEP it in map!
+				# If it's in front, set to higher detail or standard LOD.
 				if dot_product < visibility_threshold:
-					continue 
-				
-				target_lod_map[offset_coord] = 1
+					target_lod_map[offset_coord] = 0 
+				else:
+					target_lod_map[offset_coord] = 1
 
-	# If it was in our history and not in our new grid, downgrade chunk
 	for coord in prev_lod_map:
 		if not target_lod_map.has(coord):
-			# Only add it to our evaluation list if it hasn't finished hitting LOD 0 yet, 
-			# or if it is actively in flight.
-			if prev_lod_map[coord] > 0 or requested_lod_map.has(coord):
-				target_lod_map[coord] = 0
+			target_lod_map[coord] = 0
 
 	# Evaluate chunks that changed states OR are actively transitioning
 	var coords_to_evaluate := []
@@ -167,7 +151,7 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int, player_pos:
 				)
 				if _chunk_contains_surfaces(target_coord, to_lod):
 					# We need the world position to calculate priority
-					var world_pos = Vector3(target_coord) * manager.get_chunk_world_size()
+					var world_pos = Vector3(target_coord) * manager.chunk_lod_size
 					var dist = world_pos.distance_to(player_pos)
 					potential_jobs.append({"coord": target_coord, "dist": dist})
 	

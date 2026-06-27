@@ -4,19 +4,20 @@ class_name ChunkManager extends Node
 # Global Parameters 
 @export var isDev: bool = false
 @export var voxel_scale: float = 1.0
-@export var chunk_size: int = 32
+@export var chunk_size: int = 16
+var 			chunk_lod_size: float = float(chunk_size) * voxel_scale
 @export var noiseSeed: int = 0
 @export var workerCount: int = 4
 @export var dimensions: Vector3 = Vector3(128, 64, 128)
 @export var chunk_material: Material
 
-# Global Controllers
+# World Building Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
+
+# LOD Engine Controllers
 var collision_controller := CollisionController.new()
-# Controllers initialized in _ready()
-var subdivision_controller: SubdivisionController
-var query_controller: QueryController
+var subdivision_controller:= SubdivisionController.new(self)
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -29,8 +30,12 @@ var query_controller: QueryController
 
 # Job / update systems
 var job_queue := ChunkJobQueue.new()
-var dirty_chunks: Array[Chunk] = []
-@export var max_dirty_chunks_per_frame := 4
+var dirty_queue: Array[Chunk] = []
+var collision_queue: Array[Chunk] = []
+
+@export var max_dirty_queue_per_frame := 8
+@export var max_collision_updates_per_frame := 4
+var collision_updates_this_frame := 0
 
 # World state - Accepts compound keys or Vector4i equivalent strings
 var chunks: Dictionary = {}
@@ -41,18 +46,19 @@ var authorized_lod_levels: Dictionary = {}
 
 # Initial generation state synchronization tracking
 var initial_generation_cooked: bool = false
-var tracking_initial_gen: bool = false
 
 # Active asynchronous thread tracking array
 var active_thread_tasks: Array[int] = []
 
-# Decoupled entry points for ANY external script
+# Entry points for ANY external script 
+# TODO: Review these signals pattern	
 signal subdivision_requested(coord: Vector3i, target_level: int, wave_index: int)
 signal merge_requested(coord: Vector3i)
 signal generation_requested()
 signal generation_completed()
+signal chunk_mesh_finished(coord: Vector3i)
 
-var dirty_chunks_processed_this_frame := 0
+var dirty_queue_processed_this_frame := 0
 var random := FastNoiseLite.new()
 var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
 
@@ -60,8 +66,6 @@ var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
 func get_chunk_key(coord: Vector3i, lod: int) -> String:
 	return "%d_%d_%d_LOD%d" % [coord.x, coord.y, coord.z, lod]
 
-func get_chunk_world_size() -> float:
-	return float(chunk_size) * voxel_scale
 
 # Helper methods to manage authorized structural LOD levels
 func set_authorized_lod(base_coord: Vector3i, max_lod: int) -> void:
@@ -74,10 +78,6 @@ func get_authorized_lod(base_coord: Vector3i) -> int:
 # READY & LIFECYCLE
 # ----------------------------
 func _ready() -> void:
-	# Explicitly assign controllers first
-	query_controller = QueryController.new(self)
-	subdivision_controller = SubdivisionController.new(self)
-	
 	# Connect signals directly to controller methods to bypass lambda execution delays
 	subdivision_requested.connect(subdivision_controller.request_subdivision)
 	merge_requested.connect(subdivision_controller.request_merge)
@@ -89,13 +89,12 @@ func _on_subdivision_requested(coord: Vector3i, lod_level: int) -> void:
 
 ## Hook: Subdivides all chunks touching a spherical radius
 func _on_structural_impact_area_requested(world_position: Vector3, radius: float) -> void:
-	var world_size = get_chunk_world_size()
 	
 	# Compute a bounding box in chunk-space coordinates
-	var min_chunk_x = int(floor((world_position.x - radius) / world_size))
-	var max_chunk_x = int(floor((world_position.x + radius) / world_size))
-	var min_chunk_z = int(floor((world_position.z - radius) / world_size))
-	var max_chunk_z = int(floor((world_position.z + radius) / world_size))
+	var min_chunk_x = int(floor((world_position.x - radius) / chunk_lod_size))
+	var max_chunk_x = int(floor((world_position.x + radius) / chunk_lod_size))
+	var min_chunk_z = int(floor((world_position.z - radius) / chunk_lod_size))
+	var max_chunk_z = int(floor((world_position.z + radius) / chunk_lod_size))
 	
 	# Force subdivision across the entire hit envelope
 	for x in range(min_chunk_x, max_chunk_x + 1):
@@ -116,11 +115,10 @@ func _sanitize_world_settings() -> void:
 	)
 
 	chunk_size = max(1, chunk_size)
-	var chunk_world_size := get_chunk_world_size()
 	total_chunks = Vector3i(
-		max(1, ceili(dimensions.x / chunk_world_size)),
-		max(1, ceili(dimensions.y / chunk_world_size)),
-		max(1, ceili(dimensions.z / chunk_world_size))
+		max(1, ceili(dimensions.x / chunk_lod_size)),
+		max(1, ceili(dimensions.y / chunk_lod_size)),
+		max(1, ceili(dimensions.z / chunk_lod_size))
 	)
 
 func _process(_delta: float) -> void:
@@ -148,42 +146,70 @@ func _process(_delta: float) -> void:
 	# --- CONSUME DIRTY CHUNKS ---
 	if isDev and Engine.get_frames_drawn() % 120 == 0:
 		print(
-			"Dirty:",
-			dirty_chunks.size(),
-			" Processed:",
-			dirty_chunks_processed_this_frame,
-			" Active Threads:",
-			active_thread_tasks.size()
+			"Dirty:", dirty_queue.size(),
+			" Collisions Pending:", collision_queue.size(),
+			" Active Threads:", active_thread_tasks.size()
 		)
 		
 	var frame_start_time := Time.get_ticks_usec()
-	var max_allowed_budget_usec := 2000 
+	var max_allowed_budget_usec := 2500
 	
-	# Reset debug counter every single frame
-	dirty_chunks_processed_this_frame = 0
+	dirty_queue_processed_this_frame = 0
+	collision_updates_this_frame = 0
 	
-	# Queue Backlog Threshold Alert Warning
-	if dirty_chunks.size() > 128 and isDev:
-		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Current count: ", dirty_chunks.size())
+	if dirty_queue.size() > 128 and isDev:
+		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Count: ", dirty_queue.size())
+	if collision_queue.size() > 128 and isDev:
+		push_warning("Voxel Engine Warning: Collision queue backlog exceeds threshold! Count: ", collision_queue.size())
 
-	#while dirty_chunks.size() > 0:
-	for m in range(min(dirty_chunks.size(), 128)):
+	# SAFE WORKER CHECK: Verify budget BEFORE extracting items from our queue
+	while dirty_queue.size() > 0:
 		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
-			break 
+			break # Exit smoothly; item remains safe at front of queue for next frame
 			
-		var chunk = dirty_chunks.pop_front()
-		# Add deletion guard check before processing
+		var chunk = dirty_queue.pop_front()
 		if is_instance_valid(chunk) and not chunk.is_queued_for_deletion():
 			process_chunk(chunk)
 
-	if tracking_initial_gen and not initial_generation_cooked:
-		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_chunks.is_empty():
-			initial_generation_cooked = true
-			tracking_initial_gen = false
-			if isDev:
-				print("Voxel Engine: True Async generation empty. All background meshes live!")
-			generation_completed.emit()
+	# --- CONSUME COLLISION QUEUE ---
+	var c_index = 0
+	while c_index < collision_queue.size() and collision_updates_this_frame < max_collision_updates_per_frame:
+		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
+			break
 
+		var chunk = collision_queue[c_index]
+
+		if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
+			collision_queue.remove_at(c_index)
+			continue
+
+		# If this chunk is already being processed by a thread, leave it
+		# alone. The async callback will handle it. Skip to the next chunk.
+		if chunk.collision_cooking:
+			c_index += 1
+			continue
+
+		collision_queue.remove_at(c_index)
+		collision_controller.rebuild(chunk)
+		collision_updates_this_frame += 1
+			
+	if not initial_generation_cooked:
+		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_queue.is_empty() and collision_queue.is_empty():
+			initial_generation_cooked = true
+		if isDev:
+			print("Voxel Engine: True Async generation empty. All background meshes live!")
+		generation_completed.emit()
+
+
+func process_chunk(chunk: Chunk) -> void:
+	# Safe short-circuit validation check
+	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
+		return
+	dirty_queue_processed_this_frame += 1
+	# Run the meshing controller pass
+	if chunk.mesh_dirty:
+		mesh_controller.rebuild(chunk)
+		chunk_mesh_finished.emit(chunk.chunk_coordinate)
 
 func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	var coord = job.chunk_coordinate
@@ -191,7 +217,7 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	# DYNAMIC AUTHORIZATION DEPTH CHECK
 	var base_coord = coord
 	if job.lod_level > 0:
-		# Mathematically calculate the exact LOD 0 root coordinate column
+		# Calculate the exact LOD 0 root coordinate column
 		var factor = int(pow(2, job.lod_level))
 		base_coord = Vector3i(
 			int(floor(float(coord.x) / factor)),
@@ -223,6 +249,7 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 
 	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
 	var chunk: Chunk = chunk_scene.instantiate()
+	chunk.manager = self
 	chunk.position = job.world_position
 	chunk.voxel_size = local_voxel_scale
 	chunk.lod_level = job.lod_level
@@ -242,33 +269,10 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	chunks[key] = chunk
 	
 	chunk.set_voxel_data(job.data)
-	
-	if isDev:
-		_create_chunk_wireframe_bounds(chunk)
-		
 	_link_subdivision_hierarchy(coord, chunk)
 
 
-func process_chunk(chunk: Chunk) -> void:
-	# Lifecycle check safety guard
-	if not is_instance_valid(chunk) and chunk.is_queued_for_deletion():
-		return
-		
-	dirty_chunks_processed_this_frame += 1
-	
-	if chunk.mesh_dirty:
-		mesh_controller.rebuild(chunk)
 
-	# Tell the subdivision controller this specific chunk is built and ready
-		if subdivision_controller and subdivision_controller.has_method("notify_chunk_mesh_ready"):
-			subdivision_controller.notify_chunk_mesh_ready(chunk)
-			
-	#if chunk.collision_dirty:
-		#collision_controller.rebuild(chunk)
-		
-# ----------------------------
-# BACKGROUND THREAD EXECUTION BLOCK
-# ----------------------------
 func _async_worker_execute(job: ChunkJob) -> void:
 	if job.type == ChunkJob.JobType.GENERATE:
 		_bg_thread_generate_voxels(job)
@@ -293,18 +297,14 @@ func _bg_thread_generate_voxels(job: ChunkJob) -> void:
 # BASELINE INITIALIZATION
 # ----------------------------
 func start_world_generation() -> void:
-	if isDev:
-		print("Voxel Engine: Generating initial base world map...")
 	
-	tracking_initial_gen = true
 	initial_generation_cooked = false
 	
 	authorized_lod_levels.clear()
 	
-	var chunk_world_size = get_chunk_world_size()
-	var total_chunks_x = int(ceil(dimensions.x / chunk_world_size))
-	var total_chunks_y = int(ceil(dimensions.y / chunk_world_size))
-	var total_chunks_z = int(ceil(dimensions.z / chunk_world_size))
+	var total_chunks_x = int(ceil(dimensions.x / chunk_lod_size))
+	var total_chunks_y = int(ceil(dimensions.y / chunk_lod_size))
+	var total_chunks_z = int(ceil(dimensions.z / chunk_lod_size))
 	
 	var total_queued := 0
 
@@ -314,7 +314,7 @@ func start_world_generation() -> void:
 				
 				var coord = Vector3i(x, y, z)
 				authorized_lod_levels[coord] = 0 # Initialize authorization maps
-				var world_pos = Vector3(coord) * chunk_world_size
+				var world_pos = Vector3(coord) * chunk_lod_size
 				
 				var job = ChunkJob.new(
 					ChunkJob.JobType.GENERATE,
@@ -368,11 +368,19 @@ func queue_dirty_chunk(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
 		return
 
-	if chunk in dirty_chunks:
+	if chunk in dirty_queue:
 		return
 
-	dirty_chunks.append(chunk)
+	dirty_queue.append(chunk)
+	
+func queue_collision_chunk(chunk: Chunk) -> void:
+	if not is_instance_valid(chunk):
+		return
 
+	if chunk in collision_queue:
+		return
+
+	collision_queue.append(chunk)
 
 # ----------------------------
 # CHUNK WIREFRAMES (DEBUG ONLY)

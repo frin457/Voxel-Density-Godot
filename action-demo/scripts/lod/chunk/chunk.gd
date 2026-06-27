@@ -1,11 +1,10 @@
 #./scripts/lod/chunk/chunk.gd
 class_name Chunk extends StaticBody3D
 
+var manager: ChunkManager
 @export var mat: Material
 @onready var collisionShape: CollisionShape3D = $CollisionShape3D
 @onready var meshInstance: MeshInstance3D = $MeshInstance3D
-
-var current_meshing_index := 0
 
 var pending_vertices := PackedVector3Array()
 var pending_indices := PackedInt32Array()
@@ -20,17 +19,13 @@ var active := true
 var lod_level := 0       # structural depth
 var current_lod := 0     # active subdivision state
 
-# TODO:
-# Currently unused.
-# Intended for upwards LOD invalidation (0->1->2)
-# example: terrain destruction modifies child chunks
-var lod_dirty := false
-
 
 # ==================================================
 # PERFORMANCE & SURFACE CACHING
 # ==================================================
-@export var chunk_size: int = 32
+@export var chunk_size:= 32
+var chunk_size_sq := 1024
+var current_meshing_index := 0
 
 var is_empty_air := true
 var is_mesh_ready := false
@@ -51,6 +46,11 @@ var voxel_size := 1.0
 var mesh_dirty := false
 var collision_dirty := false
 
+# --- Async Collision State ---
+var collision_cooking := false 
+var collision_stale := false 
+# -----------------------------
+
 var voxel_ids := PackedByteArray()
 var voxel_density := PackedByteArray()
 var voxel_colors := PackedColorArray()
@@ -60,6 +60,7 @@ var original_voxel_density := PackedByteArray()
 var original_voxel_colors := PackedColorArray()
 
 func _ready() -> void:
+	chunk_size_sq = chunk_size * chunk_size
 	if meshInstance and not meshInstance.mesh:
 		meshInstance.mesh = ArrayMesh.new()
 
@@ -69,8 +70,10 @@ func deactivate() -> void:
 	visible = false
 	process_mode = Node.PROCESS_MODE_DISABLED
 
-	if meshInstance:		meshInstance.visible = false
-	if collisionShape:	collisionShape.set_deferred("disabled", true)
+	if meshInstance:        
+		meshInstance.visible = false
+	if collisionShape:    
+		collisionShape.set_deferred("disabled", true)
 
 
 func activate() -> void:
@@ -78,12 +81,18 @@ func activate() -> void:
 	visible = true
 	process_mode = Node.PROCESS_MODE_INHERIT
 	
-	if meshInstance:		meshInstance.visible = true
-	if collisionShape:	collisionShape.set_deferred("disabled",false)
+	if meshInstance:        
+		meshInstance.visible = true
+	if collisionShape:    
+		# null assignment forces the Godot Physics Server to cleanly rebuild its broadphase 
+		# tracking bounds for this chunk, rather than utilizing stale data.
+		if not collision_dirty and collisionShape.shape == null:
+			mark_dirty() 
+		collisionShape.set_deferred("disabled", false)
 
 
 func destroy_voxel() -> void:
-	var index = get_1d_index(position.x,	position.y,	position.z)
+	var index = chunk_coordinate.x + chunk_coordinate.y * chunk_size + chunk_coordinate.z * chunk_size_sq
 
 	if voxel_ids[index] == 0: return
 
@@ -92,11 +101,10 @@ func destroy_voxel() -> void:
 	voxel_colors[index] = Color(0,0,0,0)
 	_update_surface_cache()
 	mark_dirty()
-	#mark_lod_dirty()
 
 
 func restore_voxel() -> void:
-	var index = get_1d_index(position.x,position.y,position.z)
+	var index = chunk_coordinate.x + chunk_coordinate.y * chunk_size + chunk_coordinate.z * chunk_size_sq
 
 	if original_voxel_ids[index] == 0: return
 
@@ -108,7 +116,6 @@ func restore_voxel() -> void:
 	
 	_update_surface_cache()
 	mark_dirty()
-	#mark_lod_dirty()
 
 func set_voxel_data(data: Dictionary) -> void:
 	voxel_ids = data["ids"].duplicate()
@@ -121,7 +128,6 @@ func set_voxel_data(data: Dictionary) -> void:
 
 	_update_surface_cache()
 	mark_dirty()
-	#mark_lod_dirty()
 
 func _update_surface_cache() -> void:
 	is_empty_air = true
@@ -130,11 +136,17 @@ func _update_surface_cache() -> void:
 		sub_quadrant_has_surfaces[k] = false
 
 	var half_size = float(chunk_size) * 0.5
+	var size = chunk_size
+	var size_sq = size * size
 
-	for z in range(chunk_size):
-		for y in range(chunk_size):
-			for x in range(chunk_size):
-				var index = get_1d_index(x, y, z)
+	for z in range(size):
+		var z_offset = z * size_sq
+
+		for y in range(size):
+			var y_offset = y * size
+
+			for x in range(size):
+				var index = ( x + y_offset + z_offset )
 
 				if voxel_ids[index] == 0:
 					continue
@@ -151,25 +163,21 @@ func _update_surface_cache() -> void:
 
 
 func mark_dirty() -> void:
-	var already_dirty = mesh_dirty or collision_dirty
+	var already_dirty = mesh_dirty and collision_dirty
 	if already_dirty:
-			return
+		return
+
 	mesh_dirty = true
 	collision_dirty = true
 	is_mesh_ready = false
 
-	var manager = get_parent()
+	# If a thread is currently cooking this chunk's collision, flag the result as stale
+	# so the main thread knows to discard the old thread result when it finishes.
+	if collision_cooking:
+		collision_stale = true
+
 	if manager and manager.has_method("queue_dirty_chunk"):
 		manager.queue_dirty_chunk(self)
-
-func mark_lod_dirty() -> void:
-	lod_dirty = true
-
-	if parent_chunk:
-		parent_chunk.mark_lod_dirty()
-
-func clear_lod_dirty() -> void:
-	lod_dirty = false
 
 func get_current_lod() -> int:
 	return current_lod
@@ -179,7 +187,7 @@ func get_1d_index(x: int, y: int, z: int) -> int:
 	return (
 		x +
 		(y * chunk_size) +
-		(z * chunk_size * chunk_size)
+		(z * chunk_size_sq)
 	)
 
 
