@@ -4,18 +4,20 @@ class_name ChunkManager extends Node
 # Global Parameters 
 @export var isDev: bool = false
 @export var voxel_scale: float = 1.0
-@export var chunk_size: int = 32
+@export var chunk_size: int = 16
+var 			chunk_lod_size: float = float(chunk_size) * voxel_scale
 @export var noiseSeed: int = 0
 @export var workerCount: int = 4
 @export var dimensions: Vector3 = Vector3(128, 64, 128)
 @export var chunk_material: Material
 
-# Global Controllers
+# World Building Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
+
+# LOD Engine Controllers
 var collision_controller := CollisionController.new()
-# Controllers initialized in _ready()
-var subdivision_controller: SubdivisionController
+var subdivision_controller:= SubdivisionController.new(self)
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -31,8 +33,8 @@ var job_queue := ChunkJobQueue.new()
 var dirty_queue: Array[Chunk] = []
 var collision_queue: Array[Chunk] = []
 
-@export var max_dirty_queue_per_frame := 4
-@export var max_collision_updates_per_frame := 2
+@export var max_dirty_queue_per_frame := 8
+@export var max_collision_updates_per_frame := 4
 var collision_updates_this_frame := 0
 
 # World state - Accepts compound keys or Vector4i equivalent strings
@@ -64,8 +66,6 @@ var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
 func get_chunk_key(coord: Vector3i, lod: int) -> String:
 	return "%d_%d_%d_LOD%d" % [coord.x, coord.y, coord.z, lod]
 
-func get_chunk_world_size() -> float:
-	return float(chunk_size) * voxel_scale
 
 # Helper methods to manage authorized structural LOD levels
 func set_authorized_lod(base_coord: Vector3i, max_lod: int) -> void:
@@ -78,9 +78,6 @@ func get_authorized_lod(base_coord: Vector3i) -> int:
 # READY & LIFECYCLE
 # ----------------------------
 func _ready() -> void:
-	# Explicitly assign controllers first
-	subdivision_controller = SubdivisionController.new(self)
-	
 	# Connect signals directly to controller methods to bypass lambda execution delays
 	subdivision_requested.connect(subdivision_controller.request_subdivision)
 	merge_requested.connect(subdivision_controller.request_merge)
@@ -92,13 +89,12 @@ func _on_subdivision_requested(coord: Vector3i, lod_level: int) -> void:
 
 ## Hook: Subdivides all chunks touching a spherical radius
 func _on_structural_impact_area_requested(world_position: Vector3, radius: float) -> void:
-	var world_size = get_chunk_world_size()
 	
 	# Compute a bounding box in chunk-space coordinates
-	var min_chunk_x = int(floor((world_position.x - radius) / world_size))
-	var max_chunk_x = int(floor((world_position.x + radius) / world_size))
-	var min_chunk_z = int(floor((world_position.z - radius) / world_size))
-	var max_chunk_z = int(floor((world_position.z + radius) / world_size))
+	var min_chunk_x = int(floor((world_position.x - radius) / chunk_lod_size))
+	var max_chunk_x = int(floor((world_position.x + radius) / chunk_lod_size))
+	var min_chunk_z = int(floor((world_position.z - radius) / chunk_lod_size))
+	var max_chunk_z = int(floor((world_position.z + radius) / chunk_lod_size))
 	
 	# Force subdivision across the entire hit envelope
 	for x in range(min_chunk_x, max_chunk_x + 1):
@@ -119,11 +115,10 @@ func _sanitize_world_settings() -> void:
 	)
 
 	chunk_size = max(1, chunk_size)
-	var chunk_world_size := get_chunk_world_size()
 	total_chunks = Vector3i(
-		max(1, ceili(dimensions.x / chunk_world_size)),
-		max(1, ceili(dimensions.y / chunk_world_size)),
-		max(1, ceili(dimensions.z / chunk_world_size))
+		max(1, ceili(dimensions.x / chunk_lod_size)),
+		max(1, ceili(dimensions.y / chunk_lod_size)),
+		max(1, ceili(dimensions.z / chunk_lod_size))
 	)
 
 func _process(_delta: float) -> void:
@@ -157,7 +152,7 @@ func _process(_delta: float) -> void:
 		)
 		
 	var frame_start_time := Time.get_ticks_usec()
-	var max_allowed_budget_usec := 2000 
+	var max_allowed_budget_usec := 2500
 	
 	dirty_queue_processed_this_frame = 0
 	collision_updates_this_frame = 0
@@ -188,7 +183,7 @@ func _process(_delta: float) -> void:
 			collision_queue.remove_at(c_index)
 			continue
 
-		# Trap 2 Fix: If this chunk is already being processed by a thread, leave it
+		# If this chunk is already being processed by a thread, leave it
 		# alone. The async callback will handle it. Skip to the next chunk.
 		if chunk.collision_cooking:
 			c_index += 1
@@ -274,10 +269,6 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	chunks[key] = chunk
 	
 	chunk.set_voxel_data(job.data)
-	
-	if isDev:
-		_create_chunk_wireframe_bounds(chunk)
-		
 	_link_subdivision_hierarchy(coord, chunk)
 
 
@@ -311,10 +302,9 @@ func start_world_generation() -> void:
 	
 	authorized_lod_levels.clear()
 	
-	var chunk_world_size = get_chunk_world_size()
-	var total_chunks_x = int(ceil(dimensions.x / chunk_world_size))
-	var total_chunks_y = int(ceil(dimensions.y / chunk_world_size))
-	var total_chunks_z = int(ceil(dimensions.z / chunk_world_size))
+	var total_chunks_x = int(ceil(dimensions.x / chunk_lod_size))
+	var total_chunks_y = int(ceil(dimensions.y / chunk_lod_size))
+	var total_chunks_z = int(ceil(dimensions.z / chunk_lod_size))
 	
 	var total_queued := 0
 
@@ -324,7 +314,7 @@ func start_world_generation() -> void:
 				
 				var coord = Vector3i(x, y, z)
 				authorized_lod_levels[coord] = 0 # Initialize authorization maps
-				var world_pos = Vector3(coord) * chunk_world_size
+				var world_pos = Vector3(coord) * chunk_lod_size
 				
 				var job = ChunkJob.new(
 					ChunkJob.JobType.GENERATE,

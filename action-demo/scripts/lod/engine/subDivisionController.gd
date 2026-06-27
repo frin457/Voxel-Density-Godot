@@ -23,7 +23,7 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 		pending_subdivisions.erase(key)
 		return
 	
-	var world_size = manager.get_chunk_world_size() / pow(2, target_level)
+	var world_size = manager.chunk_lod_size / pow(2, target_level)
 		
 	for x in range(2):
 		for y in range(2):

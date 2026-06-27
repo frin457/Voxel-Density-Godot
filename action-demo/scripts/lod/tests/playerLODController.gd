@@ -3,6 +3,7 @@ class_name PlayerLODController extends Node
 
 @onready var manager: ChunkManager = $".."
 
+var chunk_lod_size := 16
 var last_chunk_coordinate := Vector3i(999999, 999999, 999999)
 var last_player_position = Vector3.ZERO
 var last_player_rotation = Vector3.ZERO
@@ -21,19 +22,18 @@ func _ready() -> void:
 			
 	if not manager:
 		push_error("PlayerLODController Error: Cannot find ChunkManager!")
-
+	chunk_lod_size = manager.chunk_lod_size 
 func _process(_delta: float) -> void:
 	var camera = get_viewport().get_camera_3d()
 	if not camera: return
 	
 	var current_pos = camera.global_position
 	var current_rot = camera.global_rotation_degrees
-	var chunk_world_size = manager.get_chunk_world_size()
 	
 	var center_coord = Vector3i(
-		floor(current_pos.x / chunk_world_size),
-		floor(current_pos.y / chunk_world_size),
-		floor(current_pos.z / chunk_world_size)
+		floor(current_pos.x / chunk_lod_size),
+		floor(current_pos.y / chunk_lod_size),
+		floor(current_pos.z / chunk_lod_size)
 	)
 	
 		# Update globals
@@ -45,7 +45,6 @@ func _process(_delta: float) -> void:
 func update_lod(camera: Camera3D) -> void:
 	var player_pos = last_player_position
 	var center_coord = last_chunk_coordinate    
-	var chunk_world_size = manager.get_chunk_world_size()
 	var camera_forward = -camera.global_transform.basis.z.normalized()
 	var target_lod_map = {}
 
@@ -65,7 +64,7 @@ func update_lod(camera: Camera3D) -> void:
 					continue
 				
 				# Determine visibility
-				var chunk_center_world = Vector3(offset_coord) * chunk_world_size + Vector3(chunk_world_size, chunk_world_size, chunk_world_size) * 0.5
+				var chunk_center_world = Vector3(offset_coord) * chunk_lod_size + Vector3(chunk_lod_size, chunk_lod_size, chunk_lod_size) * 0.5
 				var dir_to_chunk = (chunk_center_world - player_pos).normalized()
 				var dot_product = camera_forward.dot(dir_to_chunk)
 				
@@ -152,7 +151,7 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int, player_pos:
 				)
 				if _chunk_contains_surfaces(target_coord, to_lod):
 					# We need the world position to calculate priority
-					var world_pos = Vector3(target_coord) * manager.get_chunk_world_size()
+					var world_pos = Vector3(target_coord) * manager.chunk_lod_size
 					var dist = world_pos.distance_to(player_pos)
 					potential_jobs.append({"coord": target_coord, "dist": dist})
 	

@@ -27,3 +27,5 @@ func rebuild(chunk: Chunk) -> void:
 
 	if chunk.manager:
 		chunk.manager.queue_collision_chunk(chunk)
+		#chunk.manager._create_chunk_wireframe_bounds(chunk)
+		
