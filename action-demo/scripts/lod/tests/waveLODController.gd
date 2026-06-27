@@ -107,10 +107,10 @@ func _run_wave_demonstration() -> void:
 	while not manager.initial_generation_cooked:
 		await get_tree().process_frame
 		
-	var world_size_size = manager.get_chunk_world_size()
-	var total_x = int(ceil(manager.dimensions.x / world_size_size))
-	var total_z = int(ceil(manager.dimensions.z / world_size_size))
-	var total_y = int(ceil(manager.dimensions.y / world_size_size))
+	var world_chunk_size = manager.world_chunk_size
+	var total_x = int(ceil(manager.dimensions.x / world_chunk_size))
+	var total_z = int(ceil(manager.dimensions.z / world_chunk_size))
+	var total_y = int(ceil(manager.dimensions.y / world_chunk_size))
 	
 	# Build baseline static map
 	for x in range(total_x):
