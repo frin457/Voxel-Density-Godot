@@ -39,7 +39,7 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 
 			pos[d] = -1
 			while pos[d] < chunk_size:
-				# --- STEP 1: POPULATE THE MASK FOR THIS SLICE ---
+				#POPULATE THE MASK FOR THIS SLICE
 				var mask_index = 0
 				pos[v] = 0
 				while pos[v] < chunk_size:
@@ -69,7 +69,7 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 								)]
 							compare_id = voxel_ids[compare_index]
 
-						# Cull internal face matches; assign voxel ID to mask if exposed
+						# Cull internal face matches; assign voxel ID to mask, if exposed
 						if b == 0:
 							if current_id == 0 and compare_id != 0:
 								mask[mask_index] = compare_id

@@ -107,7 +107,7 @@ func update_lod(camera: Camera3D) -> void:
 			continue
 			
 		var desired_lod = target_lod_map.get(chunk_coord, 0)
-		var current_lod = base_chunk.get_current_lod()
+		var current_lod = base_chunk.current_lod
 
 		if desired_lod == current_lod:
 			var in_flight = requested_lod_map.get(chunk_coord, -1)

@@ -10,7 +10,6 @@ func generate_data(
 	max_world_height: float,
 	noise: Noise,
 	color_array: Array[Color]
-	#lod_level: int = 0
 ) -> Dictionary:
 	var voxel_count = (
 		chunk_resolution
@@ -28,14 +27,10 @@ func generate_data(
 
 	colors.fill(Color(0,0,0,0))
 	
-	var index = func index(x: int, y: int, z: int) -> int:		
-		return x + (y * chunk_resolution) +(z * chunk_resolution * chunk_resolution)
-	
 	# We loop exactly from 0 to chunk_resolution - 1 to align with the grid 
 	for x in range(chunk_resolution):
+		var world_x = chunk_position.x + (float(x) * voxel_size)
 		for z in range(chunk_resolution):
-
-			var world_x = chunk_position.x + (float(x) * voxel_size)
 			var world_z = chunk_position.z + (float(z) * voxel_size)
 
 			var noise_value = (
@@ -61,7 +56,7 @@ func generate_data(
 				var color_index = int(floor(world_y / voxel_size))
 				if color_index < 0:
 					color_index = abs(color_index)
-				var i = index.call(x,y,z)
+				var i =  x + (y * chunk_resolution) +(z * chunk_resolution * chunk_resolution)
 				#Assign properties
 				ids[i] = 1
 				density[i] = 255

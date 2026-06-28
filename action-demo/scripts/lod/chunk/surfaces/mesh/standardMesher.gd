@@ -46,7 +46,8 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 	var chunk_size = data.chunk_size
 	var chunk_size_sq = chunk_size * chunk_size
 	var voxel_scale = data.voxel_scale
-
+	var voxel_origin := Vector3.ZERO
+	
 	for z in range(chunk_size):
 		for y in range(chunk_size):
 			for x in range(chunk_size):
@@ -56,7 +57,7 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 				if data.voxel_ids[voxel_index] == 0:
 					continue
 
-				var voxel_origin = Vector3(x, y, z) * voxel_scale
+				voxel_origin = Vector3(x, y, z) * voxel_scale
 				var voxel_color = data.voxel_colors[voxel_index]
 
 				for face_dir in NEIGHBOR_OFFSETS:

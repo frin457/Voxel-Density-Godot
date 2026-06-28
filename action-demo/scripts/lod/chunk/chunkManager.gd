@@ -5,7 +5,7 @@ class_name ChunkManager extends Node
 @export var isDev: bool = false
 @export var voxel_scale: float = 1.0
 @export var chunk_size: int = 16
-var 			chunk_lod_size: float = float(chunk_size) * voxel_scale
+var 			chunk_lod_size: int  = chunk_size * voxel_scale
 @export var noiseSeed: int = 0
 @export var workerCount: int = 4
 @export var dimensions: Vector3 = Vector3(128, 64, 128)

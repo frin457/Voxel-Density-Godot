@@ -1,17 +1,16 @@
-class_name MeshSnapshot
-extends RefCounted
+#./scripts/lod/chunk/surfaces/mesh/meshSnapshot.gd
+class_name MeshSnapshot extends RefCounted
 
-var voxel_ids
-var voxel_colors
-var chunk_size
-var chunk_size_sq
-var voxel_scale
+var voxel_ids: PackedByteArray
+var voxel_colors: PackedColorArray
+var chunk_size: int
+var chunk_size_sq: int
+var voxel_scale: float
 
-var snapshot := MeshSnapshot
-
+## Calculates the flat array index for a 3D coordinate.
+## WARNING: This method carries GDScript function overhead. 
+## DO NOT use inside tight processing (n^3) loops:
+## StandardMesher, GreedyMesher, TerrainGenerationController, and Chunk._update_surface_cache 
+## ^inline and cache offsets manually in performance-critical paths.
 func get_1d_index(x: int, y: int, z: int) -> int:
-	return (
-		x +
-		(y * chunk_size) +
-		(z * chunk_size_sq)
-	)
+	return x + (y * chunk_size) + (z * chunk_size_sq)
