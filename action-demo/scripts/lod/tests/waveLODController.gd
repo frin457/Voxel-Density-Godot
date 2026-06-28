@@ -6,7 +6,7 @@ class_name LODWaveController extends Node
 @export var wave_gap_delay: float = 5.0
 
 # ==========================================
-# LOD SYSTEM HOOKS & STATE TRACKING
+# LOD STATE TRACKING
 # ==========================================
 var target_lod_map := {}
 
@@ -14,6 +14,8 @@ const MAX_UPGRADES_PER_FRAME = 4
 const MAX_DOWNGRADES_PER_FRAME = 8
 
 var target_wave_surface: Array[Vector3i] = []
+var sorted_wave_surface: Array[Vector3i] = []
+var dirty_coords: Array[Vector3i] = []
 
 func _ready() -> void:
 	if not manager:
@@ -26,13 +28,18 @@ func _ready() -> void:
 	_run_wave_demonstration()
 
 func _process(_delta: float) -> void:
-	if target_lod_map.is_empty():
+	if dirty_coords.is_empty():
 		return
 		
-	# 1. Evaluate chunks, only work on he ones with state changes
-	var coords_to_evaluate := []
-	for coord in target_lod_map:
-		var key = manager.get_chunk_key(coord, 0)
+	var remaining_dirty: Array[Vector3i] = []
+	var coords_to_evaluate: Array[Vector3i] = []
+		
+	# Evaluate chunks strictly against the pre-sorted array, filtering by dirty state
+	for chunk_coord in sorted_wave_surface:
+		if not dirty_coords.has(chunk_coord):
+			continue
+			
+		var key = manager.get_chunk_key(chunk_coord, 0)
 		if not manager.chunks.has(key):
 			continue
 			
@@ -40,31 +47,30 @@ func _process(_delta: float) -> void:
 		if not is_instance_valid(base_chunk) or base_chunk.is_queued_for_deletion():
 			continue
 			
-		var desired_lod = target_lod_map[coord]
+		var desired_lod = target_lod_map[chunk_coord]
 		var current_lod = base_chunk.get_current_lod()
 		
 		# If transition completed successfully, clear its in-flight status
 		if desired_lod == current_lod:
 			if base_chunk.requested_lod == current_lod:
 				base_chunk.requested_lod = -1
-			continue 
+			continue # Successfully finished, drops out of the dirty queue
 			
-		# If it needs an update and isn't currently mid-transition, queue it
+		# If it needs an update and isn't currently mid-transition, queue it for dispatch
 		if base_chunk.requested_lod == -1:
-			coords_to_evaluate.append(coord)
+			coords_to_evaluate.append(chunk_coord)
+			
+		# Needs update or mid-transition, keep in dirty queue for the next frame
+		remaining_dirty.append(chunk_coord)
 
-
-	# Sort sequentially by X, then Z, then Y to ensure a line propogation
-	coords_to_evaluate.sort_custom(func(a, b):
-		if a.x != b.x: return a.x < b.x
-		if a.z != b.z: return a.z < b.z
-		return a.y < b.y
-	)
+	# Update our dirty queue for the next frame
+	dirty_coords = remaining_dirty
 
 	# Throttle Params
 	var upgrades_dispatched = 0
 	var downgrades_dispatched = 0
 
+	# coords_to_evaluate built from sorted_wave_surface, already worked on
 	for chunk_coord in coords_to_evaluate:
 		var key = manager.get_chunk_key(chunk_coord, 0)
 		var base_chunk = manager.chunks[key] as Chunk
@@ -95,7 +101,7 @@ func _process(_delta: float) -> void:
 			manager.set_authorized_lod(chunk_coord, next_lod)
 
 # ==========================================
-# WAVE-PATTERN TIMELINE SEQUENCE
+# WAVE-PATTERN TIMELINE 
 # ==========================================
 func _run_wave_demonstration() -> void:
 	print("Wave Engine: Waiting for initial background generation to completely cook...")
@@ -116,6 +122,14 @@ func _run_wave_demonstration() -> void:
 				target_wave_surface.append(surface_coord)
 				target_lod_map[surface_coord] = 0
 				
+	# Cache and sort the layout ONCE
+	sorted_wave_surface = target_wave_surface.duplicate()
+	sorted_wave_surface.sort_custom(func(a, b):
+		if a.x != b.x: return a.x < b.x
+		if a.z != b.z: return a.z < b.z
+		return a.y < b.y
+	)
+				
 	print("Wave Test: Map ready! Caching baseline wave coordinates...")
 	await get_tree().create_timer(0.1).timeout
 	while true:
@@ -125,13 +139,15 @@ func _run_wave_demonstration() -> void:
 			for coord in target_wave_surface:
 				if coord.x == current_x:
 					target_lod_map[coord] = 1 # DECLARE the state change
+					if not dirty_coords.has(coord):
+						dirty_coords.append(coord)
 					advanced = true
 			if advanced:
 				await get_tree().create_timer(wave_speed).timeout
 			
 			
 		print("Wave Test: Split wave fully rendered! Holding peak layout...")
-		await get_tree().create_timer(wave_gap_delay* 2.0).timeout
+		await get_tree().create_timer(wave_gap_delay * 2.0).timeout
 		
 		print("Wave Test: ---> Dispatching Collapse Front (LOD 0) <---")
 		for current_x in range(total_x):
@@ -139,6 +155,8 @@ func _run_wave_demonstration() -> void:
 			for coord in target_wave_surface:
 				if coord.x == current_x:
 					target_lod_map[coord] = 0 # DECLARE the state change
+					if not dirty_coords.has(coord):
+						dirty_coords.append(coord)
 					advanced = true
 			if advanced:
 				await get_tree().create_timer(wave_speed).timeout
@@ -146,10 +164,6 @@ func _run_wave_demonstration() -> void:
 			
 		print("Wave Test: Collapse wave fully rendered! Resetting cycle...")
 		await get_tree().create_timer(wave_gap_delay).timeout
-
-# ==========================================
-# SYSTEM HELPERS
-# ==========================================
 
 func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int) -> void:
 	var scale := 1 << from_lod
@@ -198,8 +212,6 @@ func _dispatch_batch(coords: Array, target_lod: int) -> void:
 	for coord in coords:
 		target_lod_map[coord] = target_lod
 		manager.set_authorized_lod(coord, target_lod)
-		# Assuming you have a way to identify these specific jobs
-		#    _track_pending_batch(coord)
 		
 func _find_top_surface_chunk(x: int, z: int, max_y: int) -> Vector3i:
 	for y in range(max_y - 1, -1, -1):
