@@ -6,10 +6,9 @@ class_name LODWaveController extends Node
 @export var wave_gap_delay: float = 5.0
 
 # ==========================================
-# MODERN LOD SYSTEM HOOKS & STATE TRACKING
+# LOD SYSTEM HOOKS & STATE TRACKING
 # ==========================================
 var target_lod_map := {}
-var requested_lod_map := {}
 
 const MAX_UPGRADES_PER_FRAME = 4
 const MAX_DOWNGRADES_PER_FRAME = 8
@@ -30,7 +29,7 @@ func _process(_delta: float) -> void:
 	if target_lod_map.is_empty():
 		return
 		
-	# 1. Diff Engine: Evaluate chunks strictly against their ACTUAL current state
+	# 1. Evaluate chunks, only work on he ones with state changes
 	var coords_to_evaluate := []
 	for coord in target_lod_map:
 		var key = manager.get_chunk_key(coord, 0)
@@ -46,23 +45,23 @@ func _process(_delta: float) -> void:
 		
 		# If transition completed successfully, clear its in-flight status
 		if desired_lod == current_lod:
-			if requested_lod_map.has(coord) and requested_lod_map[coord] == current_lod:
-				requested_lod_map.erase(coord)
+			if base_chunk.requested_lod == current_lod:
+				base_chunk.requested_lod = -1
 			continue 
 			
 		# If it needs an update and isn't currently mid-transition, queue it
-		if not requested_lod_map.has(coord):
+		if base_chunk.requested_lod == -1:
 			coords_to_evaluate.append(coord)
 
-	# PROPAGATION ORDER
-	# Sort sequentially by X, then Z, then Y to ensure a perfect sweeping line
+
+	# Sort sequentially by X, then Z, then Y to ensure a line propogation
 	coords_to_evaluate.sort_custom(func(a, b):
 		if a.x != b.x: return a.x < b.x
 		if a.z != b.z: return a.z < b.z
 		return a.y < b.y
 	)
 
-	# Dispatching Throttle
+	# Throttle Params
 	var upgrades_dispatched = 0
 	var downgrades_dispatched = 0
 
@@ -76,23 +75,23 @@ func _process(_delta: float) -> void:
 		if desired_lod > current_lod:
 			var next_lod = current_lod + 1
 			
-			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue #map completed, skip
+			if base_chunk.requested_lod == next_lod: continue #map completed, skip
 			if upgrades_dispatched >= MAX_UPGRADES_PER_FRAME: continue #batch count, skip
 			#otherwise upgrade chunk
 			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod)
 			upgrades_dispatched += 1
-			requested_lod_map[chunk_coord] = next_lod
+			base_chunk.requested_lod = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
 			
 		# Dispatch Downgrades (Merge)
 		elif desired_lod < current_lod:
 			var next_lod = current_lod - 1
-			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue
+			if base_chunk.requested_lod == next_lod: continue
 			if downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME: continue
 				
 			_downgrade_chunk_lod(chunk_coord, current_lod, next_lod)
 			downgrades_dispatched += 1
-			requested_lod_map[chunk_coord] = next_lod
+			base_chunk.requested_lod = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
 
 # ==========================================
@@ -200,7 +199,7 @@ func _dispatch_batch(coords: Array, target_lod: int) -> void:
 		target_lod_map[coord] = target_lod
 		manager.set_authorized_lod(coord, target_lod)
 		# Assuming you have a way to identify these specific jobs
-		#	_track_pending_batch(coord)
+		#    _track_pending_batch(coord)
 		
 func _find_top_surface_chunk(x: int, z: int, max_y: int) -> Vector3i:
 	for y in range(max_y - 1, -1, -1):

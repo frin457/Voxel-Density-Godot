@@ -14,6 +14,10 @@ var active := true
 var lod_level := 0       # structural depth
 var current_lod := 0     # active subdivision state
 
+# LOD transistion state params
+var requested_lod := -1
+var subdivision_pending := false
+var merge_pending := false
 
 # ==================================================
 # PERFORMANCE & SURFACE CACHING

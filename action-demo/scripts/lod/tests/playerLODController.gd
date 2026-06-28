@@ -8,11 +8,10 @@ var last_chunk_coordinate := Vector3i(999999, 999999, 999999)
 var last_player_position = Vector3.ZERO
 var last_player_rotation = Vector3.ZERO
 
-var requested_lod_map := {} 
 var prev_lod_map := {}
 
 const MAX_UPGRADES_PER_FRAME = 8
-const MAX_DOWNGRADES_PER_FRAME = 16	
+const MAX_DOWNGRADES_PER_FRAME = 16    
 
 func _ready() -> void:
 	if not manager:
@@ -23,6 +22,7 @@ func _ready() -> void:
 	if not manager:
 		push_error("PlayerLODController Error: Cannot find ChunkManager!")
 	chunk_lod_size = manager.chunk_lod_size 
+
 func _process(_delta: float) -> void:
 	var camera = get_viewport().get_camera_3d()
 	if not camera: return
@@ -36,7 +36,7 @@ func _process(_delta: float) -> void:
 		floor(current_pos.z / chunk_lod_size)
 	)
 	
-		# Update globals
+	# Update globals
 	last_player_position = current_pos
 	last_player_rotation = current_rot
 	last_chunk_coordinate = center_coord
@@ -68,8 +68,8 @@ func update_lod(camera: Camera3D) -> void:
 				var dir_to_chunk = (chunk_center_world - player_pos).normalized()
 				var dot_product = camera_forward.dot(dir_to_chunk)
 				
-				# If chunk is behind us, set to lower LOD (1), but KEEP it in map!
-				# If it's in front, set to higher detail or standard LOD.
+				# If chunk is behind camera, set to lower LOD (1), but KEEP in map!
+				# If chunk in front, set to higher detail or standard LOD.
 				if dot_product < visibility_threshold:
 					target_lod_map[offset_coord] = 0 
 				else:
@@ -85,15 +85,19 @@ func update_lod(camera: Camera3D) -> void:
 		var new_intended_lod = target_lod_map[coord]
 		var old_cached_lod = prev_lod_map.get(coord, -1)
 		
-		# Is this chunk currently performing transition?
-		var is_in_flight = requested_lod_map.has(coord)
+		# check if currently performing transition
+		var is_in_flight = false
+		var key = manager.get_chunk_key(coord, 0)
+		if manager.chunks.has(key):
+			var base_chunk = manager.chunks[key]
+			is_in_flight = (base_chunk.requested_lod != -1)
 		
 		if new_intended_lod == old_cached_lod and not is_in_flight:
 			continue 
 		
 		coords_to_evaluate.append(coord)
 
-	# DIFFERENCES ONLY
+	# Process differences only
 	var upgrades_dispatched = 0
 	var downgrades_dispatched = 0
 
@@ -110,28 +114,27 @@ func update_lod(camera: Camera3D) -> void:
 		var current_lod = base_chunk.current_lod
 
 		if desired_lod == current_lod:
-			var in_flight = requested_lod_map.get(chunk_coord, -1)
-			if in_flight == current_lod:
-				requested_lod_map.erase(chunk_coord)
+			if base_chunk.requested_lod == current_lod:
+				base_chunk.requested_lod = -1
 			continue
 
 		if desired_lod > current_lod:
 			var next_lod = current_lod + 1
-			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue
+			if base_chunk.requested_lod == next_lod: continue
 			if chunk_coord != center_coord and upgrades_dispatched >= MAX_UPGRADES_PER_FRAME: continue
 				
 			_upgrade_chunk_lod(chunk_coord, current_lod, next_lod, player_pos)
 			upgrades_dispatched += 1
-			requested_lod_map[chunk_coord] = next_lod
+			base_chunk.requested_lod = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
 		else:
 			var next_lod = current_lod - 1
-			if requested_lod_map.get(chunk_coord, -1) == next_lod: continue
+			if base_chunk.requested_lod == next_lod: continue
 			if chunk_coord != center_coord and downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME: continue
 				
 			_downgrade_chunk_lod(chunk_coord, current_lod, next_lod)
 			downgrades_dispatched += 1
-			requested_lod_map[chunk_coord] = next_lod
+			base_chunk.requested_lod = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
 
 	# Preserve history for the next frame
@@ -165,16 +168,16 @@ func _downgrade_chunk_lod(
 	from_lod: int,
 	to_lod: int
 ) -> void:
-	print(
-	"DOWNGRADE ",
-	coord,
-	" FROM ",
-	from_lod,
-	" TO ",
-	to_lod,
-	" PARENT ",
-	coord
-	)
+	#print(
+	#"DOWNGRADE ",
+	#coord,
+	#" FROM ",
+	#from_lod,
+	#" TO ",
+	#to_lod,
+	#" PARENT ",
+	#coord
+	#)
 	manager.subdivision_controller.request_merge(
 		coord,
 		to_lod
@@ -200,7 +203,7 @@ func _chunk_contains_surfaces(coord: Vector3i, target_lod: int) -> bool:
 		if is_instance_valid(parent_chunk):
 			if parent_chunk.is_empty_air:
 				return false
-			# Dynamic localized quadrant lookup matching step size bitshifts
+			# Dynamic local quadrant lookup, matching step size bitshifts
 			var local_offset = Vector3i(coord.x & 1, coord.y & 1, coord.z & 1)
 			return parent_quadrant_has_surfaces(parent_chunk, local_offset)
 				
