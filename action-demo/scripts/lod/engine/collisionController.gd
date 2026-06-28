@@ -5,6 +5,9 @@ func rebuild(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
 		return
 		
+	if chunk.collision_cooking:
+		return
+		
 	if not chunk.has_node("CollisionShape3D") or not chunk.has_node("MeshInstance3D"):
 		chunk.collision_dirty = false
 		return

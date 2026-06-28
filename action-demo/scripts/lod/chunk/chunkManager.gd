@@ -3,13 +3,12 @@ class_name ChunkManager extends Node
 
 # Global Parameters 
 @export var isDev: bool = false
-@export var voxel_scale: float = 1.0
-@export var chunk_size: int = 16
-var 			chunk_lod_size: int  = chunk_size * voxel_scale
-@export var noiseSeed: int = 0
 @export var workerCount: int = 4
 @export var dimensions: Vector3 = Vector3(128, 64, 128)
+@export var voxel_scale: float = 1.0
 @export var chunk_material: Material
+@export var chunk_size: int = 16
+var         chunk_lod_size: int  = chunk_size * voxel_scale
 
 # World Building Controllers
 var terrain_generator := TerrainGenerationController.new()
@@ -34,8 +33,7 @@ var dirty_queue: Array[Chunk] = []
 var collision_queue: Array[Chunk] = []
 
 @export var max_dirty_queue_per_frame := 8
-@export var max_collision_updates_per_frame := 4
-var collision_updates_this_frame := 0
+const MAX_COLLISIONS_PER_FRAME := 2
 
 # World state - Accepts compound keys or Vector4i equivalent strings
 var chunks: Dictionary = {}
@@ -51,7 +49,7 @@ var initial_generation_cooked: bool = false
 var active_thread_tasks: Array[int] = []
 
 # Entry points for ANY external script 
-# TODO: Review these signals pattern	
+# TODO: Review these signals pattern    
 signal subdivision_requested(coord: Vector3i, target_level: int, wave_index: int)
 signal merge_requested(coord: Vector3i)
 signal generation_requested()
@@ -155,7 +153,6 @@ func _process(_delta: float) -> void:
 	var max_allowed_budget_usec := 2500
 	
 	dirty_queue_processed_this_frame = 0
-	collision_updates_this_frame = 0
 	
 	if dirty_queue.size() > 128 and isDev:
 		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Count: ", dirty_queue.size())
@@ -172,26 +169,24 @@ func _process(_delta: float) -> void:
 			process_chunk(chunk)
 
 	# --- CONSUME COLLISION QUEUE ---
-	var c_index = 0
-	while c_index < collision_queue.size() and collision_updates_this_frame < max_collision_updates_per_frame:
+	var processed_collisions = 0
+	
+	while processed_collisions < MAX_COLLISIONS_PER_FRAME and not collision_queue.is_empty():
 		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
 			break
 
-		var chunk = collision_queue[c_index]
+		var chunk = collision_queue.pop_front()
 
 		if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
-			collision_queue.remove_at(c_index)
 			continue
 
-		# If this chunk is already being processed by a thread, leave it
-		# alone. The async callback will handle it. Skip to the next chunk.
-		if chunk.collision_cooking:
-			c_index += 1
-			continue
+		chunk.collision_queued = false # Unflag
 
-		collision_queue.remove_at(c_index)
-		collision_controller.rebuild(chunk)
-		collision_updates_this_frame += 1
+		# Only dispatch if it still requires rebuilding
+		if chunk.collision_dirty:
+			collision_controller.rebuild(chunk)
+			
+		processed_collisions += 1
 			
 	if not initial_generation_cooked:
 		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_queue.is_empty() and collision_queue.is_empty():
@@ -377,9 +372,13 @@ func queue_collision_chunk(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
 		return
 
-	if chunk in collision_queue:
+	if chunk.collision_dirty == false:
 		return
 
+	if chunk.collision_queued:
+		return
+
+	chunk.collision_queued = true
 	collision_queue.append(chunk)
 
 # ----------------------------
@@ -433,4 +432,3 @@ func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
 	
 	chunk.add_child(bounds_visualizer)
 	chunk.visual_bounds_mesh = bounds_visualizer
-	

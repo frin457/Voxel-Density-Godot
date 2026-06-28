@@ -48,6 +48,7 @@ var collision_dirty := false
 # --- Async State Parameters ---
 var collision_cooking := false 
 var collision_stale := false 
+var collision_queued := false # Added to prevent O(N) array checks
 var mesh_cooking := false
 var mesh_stale := false
 # ------------------------------
