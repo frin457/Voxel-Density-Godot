@@ -1,4 +1,4 @@
-#./scripts/lod/engine/subDivisionController.gd
+# ./scripts/lod/engine/subDivisionController.gd
 class_name SubdivisionController extends RefCounted
 
 var manager: ChunkManager
@@ -43,7 +43,6 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 
 
 func subdivision_complete(parent_coord: Vector3i, lod: int) -> void:
-	# Explicitly verify the key string matches the exact level configuration
 	var parent_key = manager.get_chunk_key(parent_coord, lod - 1)
 	
 	if not manager.chunks.has(parent_key):
@@ -78,7 +77,6 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 	parent_chunk.subdivision_pending = false
 	
 	# 2. Clear gates for 8 potential child coordinates
-	# bit-shift the parent coordinate forward to match the child coordinate space
 	for x in range(2):
 		for y in range(2):
 			for z in range(2):
@@ -90,7 +88,7 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 					child_chunk.subdivision_pending = false
 					child_chunk.merge_pending = false
 
-	# Recursively scrub and free all child nodes
+	# Recursively scrub and pool all child nodes
 	_clean_child_geometry(parent_chunk)
 
 	parent_chunk.current_lod = parent_level
@@ -106,7 +104,7 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 		if not is_instance_valid(child):
 			continue
 
-		# Recursively clear out chunk grandchildren (LOD 2+)
+		# Recurse first to clear grandchildren
 		_clean_child_geometry(child)
 
 		child.parent_chunk = null
@@ -116,35 +114,26 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 			child.lod_level
 		)
 
-		# Clear out pending state gates for this child chunk.
-		# ensure that when the chunk has been a parent,
-		# it is fully available for subsequent triggers.
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		# Remove child from registry
 		manager.chunks.erase(child_key)
 		parent_chunk.child_chunks.erase(child)
-		child.queue_free()
+		manager.release_chunk(child)
 
 	parent_chunk.child_chunks.clear()
 
 
 func notify_chunk_mesh_ready(chunk: Chunk) -> void:
-	if not is_instance_valid(chunk):
+	# Added guard back to prevent LOD 0 processing
+	if not is_instance_valid(chunk) or chunk.lod_level == 0:
 		return
-
-	if chunk.lod_level == 0:
-		return
-
+		
 	var parent_chunk = chunk.parent_chunk
 	if not is_instance_valid(parent_chunk):
 		return
 
-	# Only abort if the parent is NOT currently in the state we expected.
-	# If the parent has adopted the correct LOD, keep the child!
 	if not parent_chunk.subdivision_pending:
-		# If the parent is already at the target level, this child is valid.
 		if parent_chunk.current_lod == chunk.lod_level:
 			return 
 			
@@ -153,7 +142,7 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 
 		var child_key = manager.get_chunk_key(chunk.chunk_coordinate, chunk.lod_level)
 		manager.chunks.erase(child_key)
-		chunk.queue_free()
+		manager.release_chunk(chunk)
 		return
 	
 	var all_siblings_ready := true

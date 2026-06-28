@@ -9,7 +9,7 @@ class_name ChunkManager extends Node
 @export var chunk_material: Material
 @export var chunk_size: int = 16
 var         chunk_lod_size: int  = chunk_size * voxel_scale
-
+var         inactive_chunks: Array[Chunk] = []
 # World Building Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
@@ -243,7 +243,7 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 		return
 
 	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
-	var chunk: Chunk = chunk_scene.instantiate()
+	var chunk: Chunk = acquire_chunk() 
 	chunk.manager = self
 	chunk.position = job.world_position
 	chunk.voxel_size = local_voxel_scale
@@ -253,16 +253,10 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	chunk.mat = chunk_material
 	chunk.chunk_size = chunk_size 
 
-	# --VISIBILITY GUARD ---
-	# Force child chunks to stay hidden upon instantiation. 
-	# They will only become visible when `subdivision_complete` activates them!
 	if job.lod_level > 0:
 		chunk.deactivate()
-	# -----------------------------
 
-	add_child(chunk)
 	chunks[key] = chunk
-	
 	chunk.set_voxel_data(job.data)
 	_link_subdivision_hierarchy(coord, chunk)
 
@@ -381,33 +375,58 @@ func queue_collision_chunk(chunk: Chunk) -> void:
 	chunk.collision_queued = true
 	collision_queue.append(chunk)
 
+# ==================================================
+# OBJECT POOLING
+# ==================================================
+func acquire_chunk() -> Chunk:
+	var chunk: Chunk
+	if inactive_chunks.is_empty():
+		chunk = chunk_scene.instantiate()
+		add_child(chunk) # Keep it in the scene tree permanently
+	else:
+		chunk = inactive_chunks.pop_back()
+	
+	chunk.reset()
+	return chunk
+
+func release_chunk(chunk: Chunk) -> void:
+	if not is_instance_valid(chunk):
+		return
+	chunk.deactivate()
+	inactive_chunks.append(chunk)
+
 # ----------------------------
 # CHUNK WIREFRAMES (DEBUG ONLY)
 # ----------------------------
 func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
-	var world_size = float(chunk_size) * chunk.voxel_size 
+	if chunk.visual_bounds_mesh:
+		chunk.visual_bounds_mesh.free()
+		chunk.visual_bounds_mesh = null
+
+	var world_size = float(chunk_size) * chunk.voxel_size
 
 	var min_p = Vector3.ZERO
 	var max_p = Vector3.ONE * world_size
 
 	var line_vertices := PackedVector3Array()
+
 	var append_line = func(from: Vector3, to: Vector3):
 		line_vertices.append(from)
 		line_vertices.append(to)
 
-	# Bottom Face
+	# Bottom face
 	append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, max_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, max_p.z))
 	append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, min_p.z))
-	
-	# Top Face
+
+	# Top face
 	append_line.call(Vector3(min_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, max_p.z))
 	append_line.call(Vector3(max_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
 	append_line.call(Vector3(min_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, min_p.z))
-	
-	# Vertical Pillars
+
+	# Vertical pillars
 	append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(min_p.x, max_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
 	append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(max_p.x, max_p.y, max_p.z))
@@ -422,13 +441,13 @@ func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
 
 	var debug_mat = StandardMaterial3D.new()
 	debug_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	
-	var debug_colors = [Color.GREEN, Color.CYAN, Color.ORANGE, Color.MAGENTA]
-	debug_mat.albedo_color = debug_colors[chunk.lod_level % debug_colors.size()]
+
+	var colors = [Color.GREEN, Color.CYAN, Color.ORANGE, Color.MAGENTA]
+	debug_mat.albedo_color = colors[chunk.lod_level % colors.size()]
 
 	var bounds_visualizer = MeshInstance3D.new()
 	bounds_visualizer.mesh = imm_mesh
 	bounds_visualizer.set_surface_override_material(0, debug_mat)
-	
+
 	chunk.add_child(bounds_visualizer)
 	chunk.visual_bounds_mesh = bounds_visualizer

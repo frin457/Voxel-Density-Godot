@@ -1,4 +1,3 @@
-#./scripts/lod/chunk/chunk.gd
 class_name Chunk extends StaticBody3D
 
 var manager: ChunkManager
@@ -14,7 +13,6 @@ var active := true
 var lod_level := 0       # structural depth
 var current_lod := 0     # active subdivision state
 
-# LOD transistion state params
 var requested_lod := -1
 var subdivision_pending := false
 var merge_pending := false
@@ -22,7 +20,7 @@ var merge_pending := false
 # ==================================================
 # PERFORMANCE & SURFACE CACHING
 # ==================================================
-@export var chunk_size:= 32
+@export var chunk_size := 32
 var chunk_size_sq := 1024
 var current_meshing_index := 0
 
@@ -42,16 +40,16 @@ var sub_quadrant_has_surfaces := {
 
 var visual_bounds_mesh: MeshInstance3D = null
 var voxel_size := 1.0
+
 var mesh_dirty := false
 var collision_dirty := false
 
 # --- Async State Parameters ---
 var collision_cooking := false 
 var collision_stale := false 
-var collision_queued := false # Added to prevent O(N) array checks
+var collision_queued := false
 var mesh_cooking := false
 var mesh_stale := false
-# ------------------------------
 
 var voxel_ids := PackedByteArray()
 var voxel_density := PackedByteArray()
@@ -69,14 +67,18 @@ func _ready() -> void:
 		meshInstance.mesh = ArrayMesh.new()
 
 
+# ==================================================
+# LIFECYCLE
+# ==================================================
+
 func deactivate() -> void:
 	active = false
 	visible = false
 	process_mode = Node.PROCESS_MODE_DISABLED
 
-	if meshInstance:        
+	if meshInstance:
 		meshInstance.visible = false
-	if collisionShape:    
+	if collisionShape:
 		collisionShape.set_deferred("disabled", true)
 
 
@@ -84,25 +86,29 @@ func activate() -> void:
 	active = true
 	visible = true
 	process_mode = Node.PROCESS_MODE_INHERIT
-	
-	if meshInstance:        
+
+	if meshInstance:
 		meshInstance.visible = true
-	if collisionShape:    
-		# null assignment forces the Godot Physics Server to cleanly rebuild its broadphase 
-		# tracking bounds for this chunk, rather than utilizing stale data.
+
+	if collisionShape:
 		if not collision_dirty and collisionShape.shape == null:
-			mark_dirty() 
+			mark_dirty()
 		collisionShape.set_deferred("disabled", false)
 
 
+# ==================================================
+# VOXEL OPERATIONS
+# ==================================================
+
 func destroy_voxel() -> void:
 	var index = chunk_coordinate.x + chunk_coordinate.y * chunk_size + chunk_coordinate.z * chunk_size_sq
-
-	if voxel_ids[index] == 0: return
+	if voxel_ids[index] == 0:
+		return
 
 	voxel_ids[index] = 0
 	voxel_density[index] = 0
 	voxel_colors[index] = Color(0,0,0,0)
+
 	_update_surface_cache()
 	mark_dirty()
 
@@ -110,16 +116,19 @@ func destroy_voxel() -> void:
 func restore_voxel() -> void:
 	var index = chunk_coordinate.x + chunk_coordinate.y * chunk_size + chunk_coordinate.z * chunk_size_sq
 
-	if original_voxel_ids[index] == 0: return
+	if original_voxel_ids[index] == 0:
+		return
 
-	if voxel_ids[index] != 0: return
+	if voxel_ids[index] != 0:
+		return
 
 	voxel_ids[index] = original_voxel_ids[index]
 	voxel_density[index] = original_voxel_density[index]
 	voxel_colors[index] = original_voxel_colors[index]
-	
+
 	_update_surface_cache()
 	mark_dirty()
+
 
 func set_voxel_data(data: Dictionary) -> void:
 	voxel_ids = data["ids"].duplicate()
@@ -133,10 +142,14 @@ func set_voxel_data(data: Dictionary) -> void:
 	_update_surface_cache()
 	mark_dirty()
 
+
+# ==================================================
+# SURFACE CACHE
+# ==================================================
+
 func _update_surface_cache() -> void:
 	is_empty_air = true
 
-	# Pre-allocate keys Vector3i for memory allocations
 	var q_keys = [
 		Vector3i(0,0,0), Vector3i(1,0,0),
 		Vector3i(0,1,0), Vector3i(1,1,0),
@@ -144,8 +157,7 @@ func _update_surface_cache() -> void:
 		Vector3i(0,1,1), Vector3i(1,1,1)
 	]
 
-	# Use a flat boolean array fast memory lookups (indices 0-7)
-	var q_found = [false, false, false, false, false, false, false, false]
+	var q_found = [false,false,false,false,false,false,false,false]
 	var quadrants_completed = 0
 
 	var half_size = int(chunk_size / 2)
@@ -154,11 +166,11 @@ func _update_surface_cache() -> void:
 
 	for z in range(size):
 		var z_offset = z * size_sq
-		var q_z = 4 if z >= half_size else 0 # Generates 0 or 4
+		var q_z = 4 if z >= half_size else 0
 
 		for y in range(size):
 			var y_offset = y * size
-			var q_y = 2 if y >= half_size else 0 # Generates 0 or 2
+			var q_y = 2 if y >= half_size else 0
 
 			for x in range(size):
 				var index = x + y_offset + z_offset
@@ -168,7 +180,6 @@ func _update_surface_cache() -> void:
 
 				is_empty_air = false
 
-				# Calculate a flat integer index (0 to 7)
 				var q_x = 1 if x >= half_size else 0
 				var flat_q_index = q_x + q_y + q_z
 
@@ -176,15 +187,21 @@ func _update_surface_cache() -> void:
 					q_found[flat_q_index] = true
 					quadrants_completed += 1
 
-				# EARLY EXIT: If we found a surface in all 8 quadrants
 				if quadrants_completed == 8:
 					break
-			if quadrants_completed == 8: break
-		if quadrants_completed == 8: break
+			if quadrants_completed == 8:
+				break
+		if quadrants_completed == 8:
+			break
 
-	# Map to Dictionary exactly ONCE at the end
 	for i in range(8):
 		sub_quadrant_has_surfaces[q_keys[i]] = q_found[i]
+
+
+# ==================================================
+# MESH CALLBACK
+# ==================================================
+
 func _mesh_complete():
 	mesh_cooking = false
 
@@ -192,32 +209,69 @@ func _mesh_complete():
 		mesh_stale = false
 		mark_dirty()
 		return
+
 	manager.mesh_controller.apply_mesh(self)
 
+
 func mark_dirty() -> void:
-	var already_dirty = mesh_dirty and collision_dirty
-	if already_dirty:
+	if mesh_dirty and collision_dirty:
 		return
 
 	mesh_dirty = true
 	collision_dirty = true
 	is_mesh_ready = false
 
-	# flag the result as stale
 	if collision_cooking:
 		collision_stale = true
 	if mesh_cooking:
 		mesh_stale = true
 
-	if manager and manager.has_method("queue_dirty_chunk"):
+	if manager:
 		manager.queue_dirty_chunk(self)
 
-func get_current_lod() -> int:
-	return current_lod
 
-func _exit_tree() -> void:
-	#Clear the array to sever any data connection 
-	#from a thread that is finishing up.
-	pending_surface_arrays = []
-	if parent_chunk and is_instance_valid(parent_chunk):
-		parent_chunk.child_chunks.erase(self)
+# ==================================================
+# RESET (POOL SAFE)
+# ==================================================
+
+func reset() -> void:
+	parent_chunk = null
+	child_chunks.clear()
+
+	active = false
+	lod_level = 0
+	current_lod = 0
+
+	requested_lod = -1
+	subdivision_pending = false
+	merge_pending = false
+
+	is_empty_air = true
+	is_mesh_ready = false
+
+	mesh_dirty = false
+	collision_dirty = false
+	mesh_stale = false
+	collision_stale = false
+	collision_cooking = false
+	mesh_cooking = false
+	collision_queued = false
+
+	pending_surface_arrays.clear()
+
+	# Remove ALL temporary debug children
+	for child in get_children():
+		if child == meshInstance:
+			continue
+		if child == collisionShape:
+			continue
+		child.free()
+
+	visual_bounds_mesh = null
+
+	if meshInstance and meshInstance.mesh:
+		meshInstance.mesh.clear_surfaces()
+
+	if collisionShape:
+		collisionShape.set_deferred("shape", null)
+		collisionShape.set_deferred("disabled", true)

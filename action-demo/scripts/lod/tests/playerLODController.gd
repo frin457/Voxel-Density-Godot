@@ -150,7 +150,7 @@ func update_lod(camera: Camera3D) -> void:
 			if base_chunk.requested_lod == next_lod: continue
 			if chunk_coord != center_coord and downgrades_dispatched >= MAX_DOWNGRADES_PER_FRAME: continue
 				
-			_downgrade_chunk_lod(chunk_coord, current_lod, next_lod)
+			_downgrade_chunk_lod(chunk_coord, next_lod)
 			downgrades_dispatched += 1
 			base_chunk.requested_lod = next_lod
 			manager.set_authorized_lod(chunk_coord, next_lod)
@@ -183,7 +183,6 @@ func _upgrade_chunk_lod(coord: Vector3i, from_lod: int, to_lod: int, player_pos:
 
 func _downgrade_chunk_lod(
 	coord: Vector3i,
-	from_lod: int,
 	to_lod: int
 ) -> void:
 	#print(
