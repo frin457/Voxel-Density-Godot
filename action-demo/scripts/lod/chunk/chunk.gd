@@ -6,11 +6,6 @@ var manager: ChunkManager
 @onready var collisionShape: CollisionShape3D = $CollisionShape3D
 @onready var meshInstance: MeshInstance3D = $MeshInstance3D
 
-var pending_vertices := PackedVector3Array()
-var pending_indices := PackedInt32Array()
-var pending_normals := PackedVector3Array()
-var pending_colors := PackedColorArray()
-
 var parent_chunk: Chunk = null
 var chunk_coordinate := Vector3i.ZERO
 var child_chunks: Array[Chunk] = []
@@ -46,10 +41,12 @@ var voxel_size := 1.0
 var mesh_dirty := false
 var collision_dirty := false
 
-# --- Async Collision State ---
+# --- Async State Parameters ---
 var collision_cooking := false 
 var collision_stale := false 
-# -----------------------------
+var mesh_cooking := false
+var mesh_stale := false
+# ------------------------------
 
 var voxel_ids := PackedByteArray()
 var voxel_density := PackedByteArray()
@@ -58,6 +55,8 @@ var voxel_colors := PackedColorArray()
 var original_voxel_ids := PackedByteArray()
 var original_voxel_density := PackedByteArray()
 var original_voxel_colors := PackedColorArray()
+
+var pending_surface_arrays := []
 
 func _ready() -> void:
 	chunk_size_sq = chunk_size * chunk_size
@@ -131,36 +130,64 @@ func set_voxel_data(data: Dictionary) -> void:
 
 func _update_surface_cache() -> void:
 	is_empty_air = true
-	
-	for k in sub_quadrant_has_surfaces.keys():
-		sub_quadrant_has_surfaces[k] = false
 
-	var half_size = float(chunk_size) * 0.5
+	# Pre-allocate keys Vector3i for memory allocations
+	var q_keys = [
+		Vector3i(0,0,0), Vector3i(1,0,0),
+		Vector3i(0,1,0), Vector3i(1,1,0),
+		Vector3i(0,0,1), Vector3i(1,0,1),
+		Vector3i(0,1,1), Vector3i(1,1,1)
+	]
+
+	# Use a flat boolean array fast memory lookups (indices 0-7)
+	var q_found = [false, false, false, false, false, false, false, false]
+	var quadrants_completed = 0
+
+	var half_size = int(chunk_size / 2)
 	var size = chunk_size
 	var size_sq = size * size
 
 	for z in range(size):
 		var z_offset = z * size_sq
+		var q_z = 4 if z >= half_size else 0 # Generates 0 or 4
 
 		for y in range(size):
 			var y_offset = y * size
+			var q_y = 2 if y >= half_size else 0 # Generates 0 or 2
 
 			for x in range(size):
-				var index = ( x + y_offset + z_offset )
+				var index = x + y_offset + z_offset
 
 				if voxel_ids[index] == 0:
 					continue
 
 				is_empty_air = false
 
+				# Calculate a flat integer index (0 to 7)
 				var q_x = 1 if x >= half_size else 0
-				var q_y = 1 if y >= half_size else 0
-				var q_z = 1 if z >= half_size else 0
+				var flat_q_index = q_x + q_y + q_z
 
-				sub_quadrant_has_surfaces[
-					Vector3i(q_x, q_y, q_z)
-				] = true
+				if not q_found[flat_q_index]:
+					q_found[flat_q_index] = true
+					quadrants_completed += 1
 
+				# EARLY EXIT: If we found a surface in all 8 quadrants
+				if quadrants_completed == 8:
+					break
+			if quadrants_completed == 8: break
+		if quadrants_completed == 8: break
+
+	# Map to Dictionary exactly ONCE at the end
+	for i in range(8):
+		sub_quadrant_has_surfaces[q_keys[i]] = q_found[i]
+func _mesh_complete():
+	mesh_cooking = false
+
+	if mesh_stale:
+		mesh_stale = false
+		mark_dirty()
+		return
+	manager.mesh_controller.apply_mesh(self)
 
 func mark_dirty() -> void:
 	var already_dirty = mesh_dirty and collision_dirty
@@ -171,10 +198,11 @@ func mark_dirty() -> void:
 	collision_dirty = true
 	is_mesh_ready = false
 
-	# If a thread is currently cooking this chunk's collision, flag the result as stale
-	# so the main thread knows to discard the old thread result when it finishes.
+	# flag the result as stale
 	if collision_cooking:
 		collision_stale = true
+	if mesh_cooking:
+		mesh_stale = true
 
 	if manager and manager.has_method("queue_dirty_chunk"):
 		manager.queue_dirty_chunk(self)
@@ -182,15 +210,9 @@ func mark_dirty() -> void:
 func get_current_lod() -> int:
 	return current_lod
 
-
-func get_1d_index(x: int, y: int, z: int) -> int:
-	return (
-		x +
-		(y * chunk_size) +
-		(z * chunk_size_sq)
-	)
-
-
 func _exit_tree() -> void:
+	#Clear the array to sever any data connection 
+	#from a thread that is finishing up.
+	pending_surface_arrays = []
 	if parent_chunk and is_instance_valid(parent_chunk):
 		parent_chunk.child_chunks.erase(self)

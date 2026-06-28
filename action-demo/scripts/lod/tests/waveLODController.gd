@@ -3,21 +3,18 @@ class_name LODWaveController extends Node
 
 @export var manager: ChunkManager
 @export var wave_speed: float = 0.1
-@export var wave_gap_delay: float = 1.0
+@export var wave_gap_delay: float = 5.0
 
 # ==========================================
 # MODERN LOD SYSTEM HOOKS & STATE TRACKING
 # ==========================================
 var target_lod_map := {}
 var requested_lod_map := {}
-# Track coords actively compiling their mesh
-var _active_batch_coords: Array[Vector3i] = []
 
 const MAX_UPGRADES_PER_FRAME = 4
 const MAX_DOWNGRADES_PER_FRAME = 8
 
 var target_wave_surface: Array[Vector3i] = []
-var total_x: int = 0
 
 func _ready() -> void:
 	if not manager:
@@ -135,7 +132,7 @@ func _run_wave_demonstration() -> void:
 			
 			
 		print("Wave Test: Split wave fully rendered! Holding peak layout...")
-		await get_tree().create_timer(wave_gap_delay).timeout
+		await get_tree().create_timer(wave_gap_delay* 2.0).timeout
 		
 		print("Wave Test: ---> Dispatching Collapse Front (LOD 0) <---")
 		for current_x in range(total_x):
@@ -149,7 +146,7 @@ func _run_wave_demonstration() -> void:
 			
 			
 		print("Wave Test: Collapse wave fully rendered! Resetting cycle...")
-		await get_tree().create_timer(wave_gap_delay * 2.0).timeout
+		await get_tree().create_timer(wave_gap_delay).timeout
 
 # ==========================================
 # SYSTEM HELPERS
