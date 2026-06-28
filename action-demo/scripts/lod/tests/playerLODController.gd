@@ -6,12 +6,15 @@ class_name PlayerLODController extends Node
 var chunk_lod_size := 16
 var last_chunk_coordinate := Vector3i(999999, 999999, 999999)
 var last_player_position = Vector3.ZERO
-var last_player_rotation = Vector3.ZERO
+
+var last_evaluated_chunk := Vector3i(999999,999999,999999)
+var last_forward_vector := Vector3.ZERO
 
 var prev_lod_map := {}
 
 const MAX_UPGRADES_PER_FRAME = 8
 const MAX_DOWNGRADES_PER_FRAME = 16    
+const ROTATION_THRESHOLD = 0.95
 
 func _ready() -> void:
 	if not manager:
@@ -28,7 +31,6 @@ func _process(_delta: float) -> void:
 	if not camera: return
 	
 	var current_pos = camera.global_position
-	var current_rot = camera.global_rotation_degrees
 	
 	var center_coord = Vector3i(
 		floor(current_pos.x / chunk_lod_size),
@@ -36,10 +38,26 @@ func _process(_delta: float) -> void:
 		floor(current_pos.z / chunk_lod_size)
 	)
 	
-	# Update globals
+	var current_forward = -camera.global_transform.basis.z.normalized()
+
+	var moved_chunk = (
+		center_coord != last_evaluated_chunk
+	)
+
+	var rotated_camera = (
+		last_forward_vector == Vector3.ZERO or
+		current_forward.dot(last_forward_vector) < ROTATION_THRESHOLD
+	)
+
 	last_player_position = current_pos
-	last_player_rotation = current_rot
+
+	if not moved_chunk and not rotated_camera:
+		return
+
+	last_evaluated_chunk = center_coord
+	last_forward_vector = current_forward
 	last_chunk_coordinate = center_coord
+
 	update_lod(camera)
 		
 func update_lod(camera: Camera3D) -> void:
