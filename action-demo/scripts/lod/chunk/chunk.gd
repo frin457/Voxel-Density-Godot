@@ -277,9 +277,8 @@ func reset() -> void:
 
 	visual_bounds_mesh = null
 
-	if meshInstance and meshInstance.mesh:
-		meshInstance.mesh.clear_surfaces()
-
+	if meshInstance:
+		meshInstance.mesh = null
 	if collisionShape:
 		collisionShape.set_deferred("shape", null)
 		collisionShape.set_deferred("disabled", true)
