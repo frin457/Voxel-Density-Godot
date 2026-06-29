@@ -399,9 +399,10 @@ func release_chunk(chunk: Chunk) -> void:
 # CHUNK WIREFRAMES (DEBUG ONLY)
 # ----------------------------
 func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
-	if chunk.visual_bounds_mesh:
+	if chunk.visual_bounds_mesh.mesh:
+		chunk.visual_bounds_mesh.material_override = null
+		chunk.visual_bounds_mesh.mesh = null
 		chunk.visual_bounds_mesh.free()
-		chunk.visual_bounds_mesh = null
 
 	var world_size = float(chunk_size) * chunk.voxel_size
 
