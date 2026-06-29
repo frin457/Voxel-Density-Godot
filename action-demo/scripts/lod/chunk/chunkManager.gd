@@ -8,7 +8,7 @@ class_name ChunkManager extends Node
 @export var voxel_scale: float = 1.0
 @export var chunk_material: Material
 @export var chunk_size: int = 16
-var         chunk_lod_size: int  = chunk_size * voxel_scale
+var         chunk_lod_size: float  = float(chunk_size) * voxel_scale
 var         inactive_chunks: Array[Chunk] = []
 # World Building Controllers
 var terrain_generator := TerrainGenerationController.new()
