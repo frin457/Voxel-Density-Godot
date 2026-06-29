@@ -43,6 +43,7 @@ func _generate_mesh(
 	#The main thread might have called queue_free() on this chunk 
 	# while the line above was calculating.
 	chunk.pending_surface_arrays = arrays
+	snapshot = null
 	chunk._mesh_complete.call_deferred()
 
 
