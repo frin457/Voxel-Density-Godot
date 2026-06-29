@@ -1,4 +1,3 @@
-#./generateTerrain/terrainGenerationController.gd
 class_name TerrainGenerationController extends RefCounted
 
 @export var terrainExponent = 1.5
@@ -20,11 +19,11 @@ func generate_data(
 	var ids := PackedByteArray()
 	var density := PackedByteArray()
 	var colors := PackedColorArray()
+	var color_count = color_array.size()
 
 	ids.resize(voxel_count)
 	density.resize(voxel_count)
 	colors.resize(voxel_count)
-
 	colors.fill(Color(0,0,0,0))
 	
 	# We loop exactly from 0 to chunk_resolution - 1 to align with the grid 
@@ -62,7 +61,7 @@ func generate_data(
 				density[i] = 255
 
 				colors[i] = color_array[
-					color_index % color_array.size()
+					color_index % color_count
 				]
 	return {
 		"ids": ids,
