@@ -120,6 +120,14 @@ func _sanitize_world_settings() -> void:
 	)
 
 func _process(_delta: float) -> void:
+	
+	if isDev and Engine.get_frames_drawn() % 120 == 0:
+		print(
+	"Active:", chunks.size(),
+	" Pool:", inactive_chunks.size(),
+	" Dirty:", dirty_queue.size(),
+	" Collision:", collision_queue.size()
+)
 	job_queue.flush()
 
 	while job_queue.queue.size() > 0 and active_thread_tasks.size() < workerCount:
@@ -399,10 +407,11 @@ func release_chunk(chunk: Chunk) -> void:
 # CHUNK WIREFRAMES (DEBUG ONLY)
 # ----------------------------
 func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
-	if chunk.visual_bounds_mesh.mesh:
-		chunk.visual_bounds_mesh.material_override = null
-		chunk.visual_bounds_mesh.mesh = null
-		chunk.visual_bounds_mesh.free()
+	if is_instance_valid(chunk.visual_bounds_mesh):
+		if chunk.visual_bounds_mesh.mesh:
+			chunk.visual_bounds_mesh.material_override = null
+			chunk.visual_bounds_mesh.mesh = null
+			chunk.visual_bounds_mesh.free()
 
 	var world_size = float(chunk_size) * chunk.voxel_size
 
