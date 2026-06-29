@@ -256,7 +256,15 @@ func reset() -> void:
 	collision_cooking = false
 	mesh_cooking = false
 	collision_queued = false
+	
+	voxel_ids = PackedByteArray()
+	voxel_density = PackedByteArray()
+	voxel_colors = PackedColorArray()
 
+	original_voxel_ids = PackedByteArray()
+	original_voxel_density = PackedByteArray()
+	original_voxel_colors = PackedColorArray()
+	
 	pending_surface_arrays.clear()
 
 	# Remove ALL temporary debug children
