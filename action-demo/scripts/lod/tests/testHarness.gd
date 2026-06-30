@@ -83,6 +83,22 @@ func _execute_test(test: BaseVoxelTest) -> void:
 			print("       ", result.message)
 
 
+func assert_true(condition: bool, message: String = "") -> bool:
+	if not condition:
+		push_error(message)
+	return condition
+
+
+func assert_equal(expected, actual, message: String = "") -> bool:
+	if expected != actual:
+		push_error(
+			"%s Expected: %s  Actual: %s"
+			% [message, str(expected), str(actual)]
+		)
+		return false
+	return true
+
+
 func _print_summary() -> void:
 
 	var passed := 0

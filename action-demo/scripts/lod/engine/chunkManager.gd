@@ -75,11 +75,13 @@ func get_authorized_lod(base_coord: Vector3i) -> int:
 # ----------------------------
 # READY & LIFECYCLE
 # ----------------------------
-func _ready() -> void:
-	# Connect signals directly to controller methods to bypass lambda execution delays
 	subdivision_requested.connect(subdivision_controller.request_subdivision)
 	merge_requested.connect(subdivision_controller.request_merge)
 	generation_requested.connect(start_world_generation)
+
+	# Automatically begin generation.
+	generation_requested.emit.call_deferred()
+
 
 func _on_subdivision_requested(coord: Vector3i, lod_level: int) -> void:
 	subdivision_controller.request_subdivision(coord, lod_level)
