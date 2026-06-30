@@ -43,6 +43,7 @@ func _generate_mesh(
 	#The main thread might have called queue_free() on this chunk 
 	# while the line above was calculating.
 	chunk.pending_surface_arrays = arrays
+	snapshot = null
 	chunk._mesh_complete.call_deferred()
 
 
@@ -79,3 +80,4 @@ func apply_mesh(chunk: Chunk) -> void:
 	if chunk.manager:
 		chunk.manager.queue_collision_chunk(chunk)
 		chunk.manager._create_chunk_wireframe_bounds(chunk)
+	chunk.pending_surface_arrays = []

@@ -1,4 +1,3 @@
-#./scripts/lod/engine/meshers/greedy_voxel_mesher.gd
 class_name GreedyMesher extends BaseMesher
 
 const FACE_NORMALS = [
@@ -23,6 +22,9 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 	var voxel_colors = data.voxel_colors
 	var voxel_scale = data.voxel_scale
 	
+	var mask := PackedInt32Array()
+	mask.resize(chunk_size_sq)
+	
 	# Sweep over both back/front passes (b) across all 3 dimensions (d)
 	for b in range(2):
 		for d in range(3):
@@ -33,13 +35,9 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 			var q := Vector3i.ZERO
 			q[d] = 1
 
-			# Allocate a 1D slice mask for the 2D sweep plane
-			var mask: Array[int] = []
-			mask.resize(chunk_size_sq)
-
 			pos[d] = -1
 			while pos[d] < chunk_size:
-				# --- STEP 1: POPULATE THE MASK FOR THIS SLICE ---
+				#POPULATE THE MASK FOR THIS SLICE
 				var mask_index = 0
 				pos[v] = 0
 				while pos[v] < chunk_size:
@@ -65,11 +63,10 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 									pos.x + 
 									pos.y * chunk_size + 
 									pos.z * chunk_size_sq
-								
 								)]
 							compare_id = voxel_ids[compare_index]
 
-						# Cull internal face matches; assign voxel ID to mask if exposed
+						# Cull internal face matches; assign voxel ID to mask, if exposed
 						if b == 0:
 							if current_id == 0 and compare_id != 0:
 								mask[mask_index] = compare_id
