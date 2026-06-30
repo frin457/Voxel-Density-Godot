@@ -10,6 +10,7 @@ class_name ChunkManager extends Node
 @export var chunk_size: int = 16
 var         chunk_lod_size: float  = float(chunk_size) * voxel_scale
 var         inactive_chunks: Array[Chunk] = []
+
 # World Building Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
@@ -17,6 +18,7 @@ var mesh_controller := ChunkMeshController.new()
 # LOD Engine Controllers
 var collision_controller := CollisionController.new()
 var subdivision_controller:= SubdivisionController.new(self)
+var diagnostics := DiagnosticsController.new(self)
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -124,12 +126,7 @@ func _sanitize_world_settings() -> void:
 func _process(_delta: float) -> void:
 	
 	if isDev and Engine.get_frames_drawn() % 120 == 0:
-		print(
-	"Active:", chunks.size(),
-	" Pool:", inactive_chunks.size(),
-	" Dirty:", dirty_queue.size(),
-	" Collision:", collision_queue.size()
-)
+		diagnostics.print_formatted_snapshot()
 	job_queue.flush()
 
 	while job_queue.queue.size() > 0 and active_thread_tasks.size() < workerCount:
@@ -153,11 +150,7 @@ func _process(_delta: float) -> void:
 
 	# --- CONSUME DIRTY CHUNKS ---
 	if isDev and Engine.get_frames_drawn() % 120 == 0:
-		print(
-			"Dirty:", dirty_queue.size(),
-			" Collisions Pending:", collision_queue.size(),
-			" Active Threads:", active_thread_tasks.size()
-		)
+		diagnostics.print_formatted_snapshot()
 		
 	var frame_start_time := Time.get_ticks_usec()
 	var max_allowed_budget_usec := 2500
@@ -202,7 +195,8 @@ func _process(_delta: float) -> void:
 		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_queue.is_empty() and collision_queue.is_empty():
 			initial_generation_cooked = true
 		if isDev:
-			print("Voxel Engine: True Async generation empty. All background meshes live!")
+			if isDev:
+				diagnostics.log_message("Voxel Engine: True Async generation empty. All background meshes live!")
 		generation_completed.emit()
 
 
@@ -236,7 +230,8 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 	# Base chunks (LOD 0) must ALWAYS instantiate to hold their children!
 	if job.lod_level > current_authorized_lod:
 		if isDev:
-			print("Voxel Engine Thread Guard: Discarded STALE ghost thread at ", coord, " (Job LOD: ", job.lod_level, " | Current Live Authorized LOD: ", current_authorized_lod, ")")
+			if job.lod_level > current_authorized_lod and isDev:
+				diagnostics.log_stale_thread(coord, job.lod_level, current_authorized_lod)
 		
 		var stale_key = get_chunk_key(coord, job.lod_level)
 		if chunks.has(stale_key):
@@ -328,7 +323,7 @@ func start_world_generation() -> void:
 				total_queued += 1
 				
 	if isDev:
-		print("Voxel Engine: Initial map queued successfully! Total chunks: ", total_queued)
+		diagnostics.log_message("Voxel Engine: Initial map queued successfully! Total chunks: " + str(total_queued))
 
 
 # ----------------------------

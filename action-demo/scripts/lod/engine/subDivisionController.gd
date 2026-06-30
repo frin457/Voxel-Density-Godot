@@ -138,8 +138,8 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 			return 
 			
 		if manager.isDev:
-			print("SubdivisionController: Aborting late-arrival child chunk at ", chunk.chunk_coordinate)
-
+			manager.diagnostics.log_late_arrival(chunk.chunk_coordinate)
+			
 		var child_key = manager.get_chunk_key(chunk.chunk_coordinate, chunk.lod_level)
 		manager.chunks.erase(child_key)
 		manager.release_chunk(chunk)
