@@ -7,29 +7,22 @@ var results: Array[TestResult] = []
 
 func _ready():
 
-	register_test(ExampleTest.new())
-	register_test(ManagerTest.new())
-	register_test(FailureTest.new())
-	
+	register_suite()
 	run_all()
-	
+
+
 func register_test(test: BaseVoxelTest) -> void:
 	if test == null:
 		print('No test selected, please register a test within testHarness.register_test().')
 		return
-
 	tests.append(test)
 
 
-func register_smoke_suite():
+func register_suite():
 
-	register_test(
-		ManagerTest.new()
-	)
-
-	register_test(
-		ExampleTest.new()
-	)
+	register_test(ExampleTest.new())
+	register_test(ManagerTest.new())
+	register_test(FailureTest.new())
 
 func clear_tests() -> void:
 	tests.clear()
