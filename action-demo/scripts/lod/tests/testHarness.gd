@@ -1,16 +1,35 @@
+#./scripts/lod/tests/testHarness.gd
 class_name TestHarness
 extends Node
 
 var tests: Array[BaseVoxelTest] = []
 var results: Array[TestResult] = []
 
+func _ready():
 
+	register_test(ExampleTest.new())
+	register_test(ManagerTest.new())
+	register_test(FailureTest.new())
+	
+	run_all()
+	
 func register_test(test: BaseVoxelTest) -> void:
 	if test == null:
+		print('No test selected, please register a test within testHarness.register_test().')
 		return
 
 	tests.append(test)
 
+
+func register_smoke_suite():
+
+	register_test(
+		ManagerTest.new()
+	)
+
+	register_test(
+		ExampleTest.new()
+	)
 
 func clear_tests() -> void:
 	tests.clear()
@@ -81,22 +100,6 @@ func _execute_test(test: BaseVoxelTest) -> void:
 
 		if result.message != "":
 			print("       ", result.message)
-
-
-func assert_true(condition: bool, message: String = "") -> bool:
-	if not condition:
-		push_error(message)
-	return condition
-
-
-func assert_equal(expected, actual, message: String = "") -> bool:
-	if expected != actual:
-		push_error(
-			"%s Expected: %s  Actual: %s"
-			% [message, str(expected), str(actual)]
-		)
-		return false
-	return true
 
 
 func _print_summary() -> void:

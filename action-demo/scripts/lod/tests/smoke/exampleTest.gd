@@ -1,11 +1,11 @@
-class_name ExampleTest
-extends BaseVoxelTest
+#./scripts/lod/tests/smoke/exampleTest.gd
+class_name ExampleTest extends BaseVoxelTest
 
 var value := 0
 
 
 func get_name() -> String:
-	return "Example Voxel Test"
+	return "Example Test"
 
 
 func setup() -> void:
@@ -19,6 +19,10 @@ func run() -> void:
 func validate() -> bool:
 	return value == 10
 
-
+ 
 func cleanup() -> void:
 	value = 0
+
+func fail(message:String) -> bool:
+	failure_message = message
+	return false
