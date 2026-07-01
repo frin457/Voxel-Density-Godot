@@ -10,7 +10,5 @@ var voxel_scale: float
 ## Calculates the flat array index for a 3D coordinate.
 ## WARNING: This method carries GDScript function overhead. 
 ## DO NOT use inside tight processing (n^3) loops:
-## StandardMesher, GreedyMesher, TerrainGenerationController, and Chunk._update_surface_cache 
-## ^inline and cache offsets manually in performance-critical paths.
 func get_1d_index(x: int, y: int, z: int) -> int:
 	return x + (y * chunk_size) + (z * chunk_size_sq)

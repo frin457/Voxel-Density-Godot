@@ -14,6 +14,7 @@ var         inactive_chunks: Array[Chunk] = []
 # World Building Controllers
 var terrain_generator := TerrainGenerationController.new()
 var mesh_controller := ChunkMeshController.new()
+var voxel_data_controller := VoxelDataController.new()
 
 # LOD Engine Controllers
 var collision_controller := CollisionController.new()
@@ -262,7 +263,7 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 		chunk.deactivate()
 
 	chunks[key] = chunk
-	chunk.set_voxel_data(job.data)
+	voxel_data_controller.set_voxel_data(chunk,job.data)
 	_link_subdivision_hierarchy(coord, chunk)
 
 

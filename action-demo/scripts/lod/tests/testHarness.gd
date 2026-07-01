@@ -22,8 +22,10 @@ func register_suite():
 
 	register_test(ExampleTest.new())
 	register_test(ManagerTest.new())
+	register_test(ChunkResetTest.new())
+	
 	register_test(FailureTest.new())
-
+	
 func clear_tests() -> void:
 	tests.clear()
 

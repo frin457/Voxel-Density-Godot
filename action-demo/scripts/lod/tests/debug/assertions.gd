@@ -1,6 +1,5 @@
 #./scripts/lod/tests/debug/assertions.gd
-class_name VoxelAssertions
-extends RefCounted
+class_name VoxelAssertions extends RefCounted
 
 #######
 #Layer 1 (Pool & Memory): Iterates through every active chunk in manager.chunks and verifies that chunk.is_inside_tree() returns true. 
