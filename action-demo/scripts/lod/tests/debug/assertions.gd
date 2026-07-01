@@ -116,31 +116,94 @@ static func assert_dictionary_matches_scene(manager: ChunkManager) -> bool:
 	return passed
 
 # ==============================================================================
-# LAYER 3: CHUNK STATE & MESHING PIPELINE
+# LAYER 3: COMPONENT STATE PIPELINES (VOX-310 Refactor)
 # ==============================================================================
 
+## Validates the core Chunk node lifecycle gates
 static func assert_chunk_clean(chunk: Chunk) -> bool:
 	if not is_instance_valid(chunk):
 		push_error("VoxelAssertions: Given Chunk instance is invalid.")
 		return false
 		
 	var passed := true
-	var chunk_id = "Coord: %s" % str(chunk.get("chunk_coordinate"))
+	var chunk_id = "Coord: %s" % str(chunk.chunk_coordinate)
 	
 	var flags = {
-		"mesh_cooking": chunk.get("mesh_cooking"),
-		"collision_cooking": chunk.get("collision_cooking"),
-		"mesh_dirty": chunk.get("mesh_dirty"),
-		"collision_dirty": chunk.get("collision_dirty"),
-		"subdivision_pending": chunk.get("subdivision_pending"),
-		"merge_pending": chunk.get("merge_pending")
+		"mesh_dirty": chunk.mesh_dirty,
+		"collision_dirty": chunk.collision_dirty,
+		"subdivision_pending": chunk.subdivision_pending,
+		"merge_pending": chunk.merge_pending
 	}
 	
 	for flag_name in flags:
 		if flags[flag_name] == true:
-			push_error("VoxelAssertions: Clean-state failure! Chunk [%s] has trailing flag: %s == true." % [chunk_id, flag_name])
+			push_error("VoxelAssertions: Core state failure! Chunk [%s] has trailing flag: %s == true." % [chunk_id, flag_name])
 			passed = false
 			
+	return passed
+
+
+## Validates the MeshController has dropped all references and arrays for a chunk
+static func assert_mesh_controller_clean(controller: ChunkMeshController, chunk: Chunk) -> bool:
+	if not is_instance_valid(controller) or not is_instance_valid(chunk):
+		push_error("VoxelAssertions: Invalid controller or chunk instance.")
+		return false
+
+	var passed := true
+	var chunk_id = "Coord: %s" % str(chunk.chunk_coordinate)
+
+	if controller.cooking_chunks.has(chunk):
+		push_error("VoxelAssertions: Mesh Controller leak! Chunk [%s] is still tracked as mesh_cooking." % chunk_id)
+		passed = false
+		
+	if controller.stale_chunks.has(chunk):
+		push_error("VoxelAssertions: Mesh Controller leak! Chunk [%s] is still tracked as mesh_stale." % chunk_id)
+		passed = false
+		
+	if controller.pending_surfaces.has(chunk) and controller.pending_surfaces[chunk].size() > 0:
+		push_error("VoxelAssertions: Mesh Controller leak! Chunk [%s] has unapplied pending_surface_arrays." % chunk_id)
+		passed = false
+
+	return passed
+
+
+## Validates the CollisionController has dropped all async tracking for a chunk
+static func assert_collision_controller_clean(controller: CollisionController, chunk: Chunk) -> bool:
+	if not is_instance_valid(controller) or not is_instance_valid(chunk):
+		push_error("VoxelAssertions: Invalid controller or chunk instance.")
+		return false
+
+	var passed := true
+	var chunk_id = "Coord: %s" % str(chunk.chunk_coordinate)
+
+	if controller.cooking_chunks.has(chunk):
+		push_error("VoxelAssertions: Collision Controller leak! Chunk [%s] is still tracked as collision_cooking." % chunk_id)
+		passed = false
+		
+	if controller.stale_chunks.has(chunk):
+		push_error("VoxelAssertions: Collision Controller leak! Chunk [%s] is still tracked as collision_stale." % chunk_id)
+		passed = false
+
+	return passed
+
+
+## Validates that the VoxelDataController successfully clears its heavy arrays when pooled
+static func assert_voxel_data_clean(data_controller: Node) -> bool:
+	if not is_instance_valid(data_controller):
+		push_error("VoxelAssertions: Invalid VoxelDataController instance.")
+		return false
+
+	var passed := true
+	
+	# Check that heavy arrays were cleared to free memory
+	if data_controller.get("voxel_ids").size() > 0:
+		push_error("VoxelAssertions: Voxel Data leak! voxel_ids array was not cleared upon reset.")
+		passed = false
+		
+	if data_controller.get("original_voxel_ids").size() > 0:
+		push_error("VoxelAssertions: Voxel Data leak! original_voxel_ids array was not cleared upon reset.")
+		passed = false
+
 	return passed
 
 # ==============================================================================
