@@ -1,11 +1,14 @@
-#./scripts/lod/engine/collisionController.gd
 class_name CollisionController extends RefCounted
+
+# Internal State Tracking (Moved from Chunk)
+var cooking_chunks: Dictionary = {}
+var stale_chunks: Dictionary = {}
 
 func rebuild(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
 		return
 		
-	if chunk.collision_cooking:
+	if cooking_chunks.has(chunk):
 		return
 		
 	if not chunk.has_node("CollisionShape3D") or not chunk.has_node("MeshInstance3D"):
@@ -25,14 +28,13 @@ func rebuild(chunk: Chunk) -> void:
 		return
 		
 	# Extract local vertex faces safely on the main thread
-	# (Packed arrays use copy-on-write, making this snapshot thread-safe to pass)
 	var faces = mesh_instance.mesh.get_faces()
 	
 	if faces.size() > 0:
-		chunk.collision_cooking = true
-		chunk.collision_stale = false
+		cooking_chunks[chunk] = true
+		stale_chunks.erase(chunk)
 		
-		# Dispatch heavy generation a worker
+		# Dispatch heavy generation to a worker
 		WorkerThreadPool.add_task(
 			_cook_collision_shape.bind(chunk.get_instance_id(), faces), 
 			true, 
@@ -45,25 +47,25 @@ func rebuild(chunk: Chunk) -> void:
 # Executes on Background Worker Thread
 func _cook_collision_shape(chunk_id: int, faces: PackedVector3Array) -> void:
 	var shape := ConcavePolygonShape3D.new()
-	# set_faces() triggers the rebuild
 	shape.set_faces(faces)
 	
-	# Safely pass the cooked shape back to the main thread
 	_apply_collision.call_deferred(chunk_id, shape)
+
 
 # Executes on Main Thread via call_deferred
 func _apply_collision(chunk_id: int, shape: ConcavePolygonShape3D) -> void:
 	var chunk: Chunk = instance_from_id(chunk_id) as Chunk
 	
-	# If the chunk was freed while we were cooking, it will be null here. Safe exit!
 	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
 		return
 		
-	# if chunk was modified while cooking, discard result
-	if chunk.collision_stale:
-		chunk.collision_cooking = false
+	# Check internal controller state for staleness
+	if stale_chunks.has(chunk):
+		cooking_chunks.erase(chunk)
+		stale_chunks.erase(chunk)
+		
 		# Re-queue so the manager fires rebuild() with the new mesh
-		if chunk.manager:
+		if chunk.manager and chunk.manager.has_method("queue_collision_chunk"):
 			chunk.manager.queue_collision_chunk(chunk)
 		return
 
@@ -72,8 +74,9 @@ func _apply_collision(chunk_id: int, shape: ConcavePolygonShape3D) -> void:
 	collision_shape.set_deferred("shape", shape)
 	
 	chunk.collision_dirty = false
-	chunk.collision_cooking = false
+	cooking_chunks.erase(chunk)
 	
 	# notify completion when async physics are applied
-	if chunk.manager and chunk.manager.subdivision_controller and chunk.manager.subdivision_controller.has_method("notify_chunk_mesh_ready"):
-		chunk.manager.subdivision_controller.notify_chunk_mesh_ready(chunk)
+	if chunk.manager and chunk.manager.get("subdivision_controller"):
+		if chunk.manager.subdivision_controller.has_method("notify_chunk_mesh_ready"):
+			chunk.manager.subdivision_controller.notify_chunk_mesh_ready(chunk)

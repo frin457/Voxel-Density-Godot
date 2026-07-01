@@ -1,21 +1,24 @@
 class_name ChunkMeshController extends RefCounted
 
 var active_mesher: BaseMesher = StandardMesher.new()
-#var active_mesher: BaseMesher = GreedyMesher.new()
 
+# Internal State Tracking (Moved from Chunk)
+var cooking_chunks: Dictionary = {}
+var stale_chunks: Dictionary = {}
+var pending_surfaces: Dictionary = {}
 
 func rebuild(chunk: Chunk) -> void:
-	if !is_instance_valid(chunk):
+	if not is_instance_valid(chunk):
 		return
 
-	if chunk.mesh_cooking:
-		chunk.mesh_stale = true
+	# Check internal controller state instead of chunk state
+	if cooking_chunks.has(chunk):
+		stale_chunks[chunk] = true
 		return
 
-	chunk.mesh_cooking = true
+	cooking_chunks[chunk] = true
 
 	var snapshot := MeshSnapshot.new()
-
 	snapshot.voxel_ids = chunk.voxel_ids.duplicate()
 	snapshot.voxel_colors = chunk.voxel_colors.duplicate()
 	snapshot.chunk_size = chunk.chunk_size
@@ -33,51 +36,58 @@ func _generate_mesh(
 	chunk: Chunk,
 	snapshot: MeshSnapshot
 ) -> void:
-
-	if !is_instance_valid(chunk):
-		return
-	var arrays = active_mesher.generate_mesh_data(snapshot)
-	if !is_instance_valid(chunk):
+	if not is_instance_valid(chunk):
 		return
 		
-	#The main thread might have called queue_free() on this chunk 
-	# while the line above was calculating.
-	chunk.pending_surface_arrays = arrays
-	snapshot = null
-	chunk._mesh_complete.call_deferred()
+	var arrays = active_mesher.generate_mesh_data(snapshot)
+	
+	if not is_instance_valid(chunk):
+		return
+		
+	# Store surface arrays in the controller, not the chunk
+	pending_surfaces[chunk] = arrays
+	
+	# Route the completion callback back to this controller
+	_mesh_complete.call_deferred(chunk)
+
+
+# New internal callback to replace the one previously inside Chunk
+func _mesh_complete(chunk: Chunk) -> void:
+	cooking_chunks.erase(chunk)
+	
+	if stale_chunks.has(chunk):
+		stale_chunks.erase(chunk)
+		if is_instance_valid(chunk) and chunk.has_method("mark_dirty"):
+			chunk.mark_dirty()
+		return
+
+	apply_mesh(chunk)
 
 
 func apply_mesh(chunk: Chunk) -> void:
-	if !is_instance_valid(chunk):
+	if not is_instance_valid(chunk):
+		pending_surfaces.erase(chunk) # Prevent memory leaks if chunk was destroyed
 		return
 
-	var surface_arrays = chunk.pending_surface_arrays
+	var surface_arrays = pending_surfaces.get(chunk, [])
 
-	if (
-		surface_arrays.size() > 0 and
-		surface_arrays[Mesh.ARRAY_VERTEX] != null
-	):
+	if surface_arrays.size() > 0 and surface_arrays[Mesh.ARRAY_VERTEX] != null:
 		var new_mesh = ArrayMesh.new()
-
-		new_mesh.add_surface_from_arrays(
-			Mesh.PRIMITIVE_TRIANGLES,
-			surface_arrays
-		)
-
+		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface_arrays)
 		chunk.meshInstance.mesh = new_mesh
 
 		if chunk.mat:
-			chunk.meshInstance.set_surface_override_material(
-				0,
-				chunk.mat
-			)
+			chunk.meshInstance.set_surface_override_material(0, chunk.mat)
 	else:
 		chunk.meshInstance.mesh = null
 
 	chunk.mesh_dirty = false
 	chunk.collision_dirty = true
+	
+	# Cleanup memory
+	pending_surfaces.erase(chunk)
 
 	if chunk.manager:
 		chunk.manager.queue_collision_chunk(chunk)
-		chunk.manager._create_chunk_wireframe_bounds(chunk)
-	chunk.pending_surface_arrays = []
+		if chunk.manager.has_method("_create_chunk_wireframe_bounds"):
+			chunk.manager._create_chunk_wireframe_bounds(chunk)

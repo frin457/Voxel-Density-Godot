@@ -1,16 +1,5 @@
 class_name Chunk extends StaticBody3D
 
-
-# ==================================================
-# VOXEL STORAGE → VoxelDataController
-# ==================================================
-var voxel_ids := PackedByteArray()
-var voxel_density := PackedByteArray()
-var voxel_colors := PackedColorArray()
-var original_voxel_ids := PackedByteArray()
-var original_voxel_density := PackedByteArray()
-var original_voxel_colors := PackedColorArray()
-
 # ==================================================
 # CORE OWNERSHIP (KEEP)
 # ==================================================
@@ -32,14 +21,12 @@ var collision_dirty := false
 var subdivision_pending := false
 var merge_pending := false
 
-
 # ==================================================
 # SCENE REFERENCES (KEEP FOR NOW - STRUCTURAL DEPENDENCY)
 # ==================================================
 
 @onready var collisionShape: CollisionShape3D = $CollisionShape3D
 @onready var meshInstance: MeshInstance3D = $MeshInstance3D
-
 
 # ==================================================
 # CONFIG (KEEP)
@@ -49,7 +36,6 @@ var merge_pending := false
 var chunk_size_sq := 1024
 var voxel_size := 1.0
 
-
 # ==================================================
 # INITIALIZATION
 # ==================================================
@@ -58,7 +44,6 @@ func _ready() -> void:
 	chunk_size_sq = chunk_size * chunk_size
 	if meshInstance and not meshInstance.mesh:
 		meshInstance.mesh = ArrayMesh.new()
-
 
 # ==================================================
 # LIFECYCLE (KEEP - CORE CONTRACT)
@@ -75,8 +60,7 @@ func activate() -> void:
 	if collisionShape:
 		if not collision_dirty and collisionShape.shape == null:
 			mark_dirty()
-		collisionShape.set_deferred("disabled", false)
-
+		collisionShape.set_deferred("disabled", false) 
 
 func deactivate() -> void:
 	active = false
@@ -87,8 +71,7 @@ func deactivate() -> void:
 		meshInstance.visible = false
 
 	if collisionShape:
-		collisionShape.set_deferred("disabled", true)
-
+		collisionShape.set_deferred("disabled", true) 
 
 # ==================================================
 # RESET (KEEP - CORE POOL CONTRACT)
@@ -107,7 +90,6 @@ func reset() -> void:
 
 	mesh_dirty = false
 	collision_dirty = false
-
 
 # ==================================================
 # DIRTY STATE (KEEP - CORE SIGNAL CONTRACT)
