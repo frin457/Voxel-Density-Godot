@@ -90,7 +90,7 @@ func reset() -> void:
 
 	mesh_dirty = false
 	collision_dirty = false
-
+	
 # ==================================================
 # DIRTY STATE (KEEP - CORE SIGNAL CONTRACT)
 # ==================================================

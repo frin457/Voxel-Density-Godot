@@ -404,58 +404,58 @@ func release_chunk(chunk: Chunk) -> void:
 # ----------------------------
 # CHUNK WIREFRAMES (DEBUG ONLY)
 # ----------------------------
-func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
-	if is_instance_valid(chunk.visual_bounds_mesh):
-		if chunk.visual_bounds_mesh.mesh:
-			chunk.visual_bounds_mesh.material_override = null
-			chunk.visual_bounds_mesh.mesh = null
-			chunk.visual_bounds_mesh.free()
-
-	var world_size = float(chunk_size) * chunk.voxel_size
-
-	var min_p = Vector3.ZERO
-	var max_p = Vector3.ONE * world_size
-
-	var line_vertices := PackedVector3Array()
-
-	var append_line = func(from: Vector3, to: Vector3):
-		line_vertices.append(from)
-		line_vertices.append(to)
-
-	# Bottom face
-	append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, min_p.z))
-	append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, max_p.z))
-	append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, max_p.z))
-	append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, min_p.z))
-
-	# Top face
-	append_line.call(Vector3(min_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
-	append_line.call(Vector3(max_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, max_p.z))
-	append_line.call(Vector3(max_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
-	append_line.call(Vector3(min_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, min_p.z))
-
-	# Vertical pillars
-	append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(min_p.x, max_p.y, min_p.z))
-	append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
-	append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(max_p.x, max_p.y, max_p.z))
-	append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
-
-	var surface_array = []
-	surface_array.resize(Mesh.ARRAY_MAX)
-	surface_array[Mesh.ARRAY_VERTEX] = line_vertices
-
-	var imm_mesh = ArrayMesh.new()
-	imm_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, surface_array)
-
-	var debug_mat = StandardMaterial3D.new()
-	debug_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-
-	var colors = [Color.GREEN, Color.CYAN, Color.ORANGE, Color.MAGENTA]
-	debug_mat.albedo_color = colors[chunk.lod_level % colors.size()]
-
-	var bounds_visualizer = MeshInstance3D.new()
-	bounds_visualizer.mesh = imm_mesh
-	bounds_visualizer.set_surface_override_material(0, debug_mat)
-
-	chunk.add_child(bounds_visualizer)
-	chunk.visual_bounds_mesh = bounds_visualizer
+#func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
+	#if is_instance_valid(chunk.visual_bounds_mesh):
+		#if chunk.visual_bounds_mesh.mesh:
+			#chunk.visual_bounds_mesh.material_override = null
+			#chunk.visual_bounds_mesh.mesh = null
+			#chunk.visual_bounds_mesh.free()
+#
+	#var world_size = float(chunk_size) * chunk.voxel_size
+#
+	#var min_p = Vector3.ZERO
+	#var max_p = Vector3.ONE * world_size
+#
+	#var line_vertices := PackedVector3Array()
+#
+	#var append_line = func(from: Vector3, to: Vector3):
+		#line_vertices.append(from)
+		#line_vertices.append(to)
+#
+	## Bottom face
+	#append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, min_p.z))
+	#append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, max_p.z))
+	#append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, max_p.z))
+	#append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, min_p.z))
+#
+	## Top face
+	#append_line.call(Vector3(min_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
+	#append_line.call(Vector3(max_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, max_p.z))
+	#append_line.call(Vector3(max_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
+	#append_line.call(Vector3(min_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, min_p.z))
+#
+	## Vertical pillars
+	#append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(min_p.x, max_p.y, min_p.z))
+	#append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
+	#append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(max_p.x, max_p.y, max_p.z))
+	#append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
+#
+	#var surface_array = []
+	#surface_array.resize(Mesh.ARRAY_MAX)
+	#surface_array[Mesh.ARRAY_VERTEX] = line_vertices
+#
+	#var imm_mesh = ArrayMesh.new()
+	#imm_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, surface_array)
+#
+	#var debug_mat = StandardMaterial3D.new()
+	#debug_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+#
+	#var colors = [Color.GREEN, Color.CYAN, Color.ORANGE, Color.MAGENTA]
+	#debug_mat.albedo_color = colors[chunk.lod_level % colors.size()]
+#
+	#var bounds_visualizer = MeshInstance3D.new()
+	#bounds_visualizer.mesh = imm_mesh
+	#bounds_visualizer.set_surface_override_material(0, debug_mat)
+#
+	#chunk.add_child(bounds_visualizer)
+	#chunk.visual_bounds_mesh = bounds_visualizer
