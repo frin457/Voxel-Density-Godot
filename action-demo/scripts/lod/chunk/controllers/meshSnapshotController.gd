@@ -1,7 +1,7 @@
 class_name MeshSnapshotController extends RefCounted
 
 func create_snapshot(
-	voxel_data: VoxelData,
+	voxel_data: VoxelChunkData,
 	grid: VoxelGridInfo
 ) -> MeshSnapshot:
 	var snapshot := MeshSnapshot.new()

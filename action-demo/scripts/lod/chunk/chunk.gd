@@ -5,7 +5,7 @@ class_name Chunk extends StaticBody3D
 # ==================================================
 
 var manager: ChunkManager
-var voxel_data:= VoxelData.new()
+var voxel_data:= VoxelChunkData.new()
 var grid_info := VoxelGridInfo.new()
 var parent_chunk: Chunk = null
 var child_chunks: Array[Chunk] = []

@@ -2,7 +2,7 @@
 class_name VoxelDataControllerTest extends BaseVoxelTest
 
 var controller: VoxelDataController
-var data: VoxelData
+var data: VoxelChunkData
 
 var voxel_data := {}
 
@@ -13,7 +13,7 @@ func get_name() -> String:
 func setup() -> void:
 
 	controller = VoxelDataController.new()
-	data = VoxelData.new()
+	data = VoxelChunkData.new()
 
 
 	# Required cache members

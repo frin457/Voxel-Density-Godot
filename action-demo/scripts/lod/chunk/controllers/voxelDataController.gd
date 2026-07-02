@@ -7,7 +7,7 @@ extends RefCounted
 # ==================================================
 
 func set_voxel_data(
-	voxel_data: VoxelData,
+	voxel_data: VoxelChunkData,
 	source: Dictionary
 ) -> void:
 
@@ -20,7 +20,7 @@ func set_voxel_data(
 	voxel_data.original_voxel_colors = voxel_data.voxel_colors.duplicate()
 
 func destroy_voxel(
-	voxel_data: VoxelData,
+	voxel_data: VoxelChunkData,
 	index: int
 ) -> void:
 
@@ -37,7 +37,7 @@ func destroy_voxel(
 
 
 func restore_voxel(
-	voxel_data: VoxelData,
+	voxel_data: VoxelChunkData,
 	index: int
 ) -> void:
 
@@ -53,7 +53,7 @@ func restore_voxel(
 	voxel_data.voxel_colors[index] = voxel_data.original_voxel_colors[index]
 
 
-func clear_voxel_data(voxel_data: VoxelData) -> void:
+func clear_voxel_data(voxel_data: VoxelChunkData) -> void:
 	if not is_instance_valid(voxel_data):
 		return
 
@@ -75,7 +75,7 @@ func clear_voxel_data(voxel_data: VoxelData) -> void:
 ## SURFACE CACHE
 ## ==================================================
 #
-#func update_surface_cache(voxel_data: VoxelData) -> void:
+#func update_surface_cache(voxel_data: VoxelChunkData) -> void:
 #
 	#if not is_instance_valid(chunk):
 		#return
@@ -153,7 +153,7 @@ func clear_voxel_data(voxel_data: VoxelData) -> void:
 # ==================================================
 #
 #func _get_index(
-	#voxel_data: VoxelData,
+	#voxel_data: VoxelChunkData,
 	#local_coordinate: Vector3i
 #) -> int:
 #

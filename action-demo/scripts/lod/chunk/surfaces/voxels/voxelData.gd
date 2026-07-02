@@ -1,4 +1,4 @@
-class_name VoxelData
+class_name VoxelChunkData
 extends RefCounted
 
 # ==================================================
