@@ -145,19 +145,3 @@ func clear_voxel_data(voxel_data: VoxelChunkData) -> void:
 	# TODO VOX-312
 	# Replace direct voxel access with VoxelDataController API.
 		#chunk.sub_quadrant_has_surfaces[q_keys[i]] = q_found[i]
-
-
-# ==================================================
-# PRIVATE
-# ==================================================
-#
-#func _get_index(
-	#voxel_data: VoxelChunkData,
-	#local_coordinate: Vector3i
-#) -> int:
-#
-	#return (
-		#local_coordinate.x +
-		#local_coordinate.y * voxel_data.chunk_size +
-		#local_coordinate.z * voxel_data.chunk_size_sq
-	#)
