@@ -1,5 +1,4 @@
-class_name VoxelChunkData
-extends RefCounted
+class_name VoxelChunkData extends RefCounted
 
 # ==================================================
 # VOXEL CONTENT
