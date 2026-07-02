@@ -1,5 +1,5 @@
 class_name FailureTest
-extends BaseVoxelTest
+extends BaseTest
 
 func get_name():
 	return "Intentional Failure"

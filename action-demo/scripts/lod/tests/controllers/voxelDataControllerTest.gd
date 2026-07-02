@@ -1,5 +1,5 @@
 #./scripts/lod/tests/controllers/voxelDataTest.gd
-class_name VoxelDataControllerTest extends BaseVoxelTest
+class_name VoxelDataControllerTest extends BaseTest
 
 var controller: VoxelDataController
 var data: VoxelChunkData
@@ -14,7 +14,6 @@ func setup() -> void:
 
 	controller = VoxelDataController.new()
 	data = VoxelChunkData.new()
-
 
 	# Required cache members
 
@@ -95,16 +94,6 @@ func _test_set_voxel_data() -> bool:
 		data.original_voxel_ids.get(0),
 		"Original ids should be duplicated."
 	) and passed
-
-	#passed = assert_true(
-		#data.mesh_dirty,
-		#"Chunk should become mesh dirty."
-	#) and passed
-#
-	#passed = assert_true(
-		#data.collision_dirty,
-		#"Chunk should become collision dirty."
-	#) and passed
 
 	return passed
 

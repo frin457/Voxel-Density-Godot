@@ -1,6 +1,5 @@
-#./scripts/lod/chunk/surfaces/voxels/voxelDataController.gd
-class_name VoxelDataController
-extends RefCounted
+#./scripts/lod/chunk/controllers/voxelDataController.gd
+class_name VoxelDataController extends RefCounted
 
 # ==================================================
 # PUBLIC API

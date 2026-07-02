@@ -1,5 +1,5 @@
 #./scripts/lod/tests/smoke/exampleTest.gd
-class_name ExampleTest extends BaseVoxelTest
+class_name ExampleTest extends BaseTest
 
 #Example of how to set up a test file
 var value := 0

@@ -1,3 +1,4 @@
+#./scripts/lod/chunk/controllers/chunkMeshController.gd
 class_name ChunkMeshController extends RefCounted
 
 var active_mesher: BaseMesher = StandardMesher.new()
@@ -9,7 +10,8 @@ var pending_surfaces : Dictionary = {}
 
 func rebuild(
 	chunk: Chunk,
-	snapshot: MeshSnapshot
+	snapshot: MeshSnapshot,
+	#material: Material
 ) -> void:
 
 	if not is_instance_valid(chunk):

@@ -1,5 +1,5 @@
-#./scripts/lod/tests/baseVoxelTest.gd
-class_name BaseVoxelTest
+#./scripts/lod/tests/BaseTest.gd
+class_name BaseTest
 extends RefCounted
 
 var failure_message := ""

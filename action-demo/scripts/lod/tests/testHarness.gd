@@ -1,8 +1,7 @@
 #./scripts/lod/tests/testHarness.gd
-class_name TestHarness
-extends Node
+class_name TestHarness extends Node
 
-var tests: Array[BaseVoxelTest] = []
+var tests: Array[BaseTest] = []
 var results: Array[TestResult] = []
 
 func _ready():
@@ -11,7 +10,7 @@ func _ready():
 	run_all()
 
 
-func register_test(test: BaseVoxelTest) -> void:
+func register_test(test: BaseTest) -> void:
 	if test == null:
 		print('No test selected, please register a test within testHarness.register_test().')
 		return
@@ -45,7 +44,7 @@ func run_all() -> void:
 	_print_summary()
 
 
-func _execute_test(test: BaseVoxelTest) -> void:
+func _execute_test(test: BaseTest) -> void:
 
 	var result := TestResult.new()
 	result.test_name = test.get_name()
