@@ -7,18 +7,18 @@ extends RefCounted
 # PUBLIC API
 # ==================================================
 
-func set_voxel_data(voxel_data: VoxelData, data: Dictionary) -> void:
-	if not is_instance_valid(voxel_data):
-		return
+func set_voxel_data(
+	voxel_data: VoxelData,
+	source: Dictionary
+) -> void:
 
-	data.voxel_ids = data["ids"].duplicate()
-	data.voxel_density = data["density"].duplicate()
-	data.voxel_colors = data["colors"].duplicate()
+	voxel_data.voxel_ids = source["ids"].duplicate()
+	voxel_data.voxel_density = source["density"].duplicate()
+	voxel_data.voxel_colors = source["colors"].duplicate()
 
-	data.original_voxel_ids = data.voxel_ids.duplicate()
-	data.original_voxel_density = data.voxel_density.duplicate()
-	data.original_voxel_colors = data.voxel_colors.duplicate()
-
+	voxel_data.original_voxel_ids = voxel_data.voxel_ids.duplicate()
+	voxel_data.original_voxel_density = voxel_data.voxel_density.duplicate()
+	voxel_data.original_voxel_colors = voxel_data.voxel_colors.duplicate()
 
 func destroy_voxel(
 	voxel_data: VoxelData,
@@ -27,18 +27,14 @@ func destroy_voxel(
 
 	if not is_instance_valid(voxel_data):
 		return
-
-	
-
 	if voxel_data.voxel_ids.get(index) == 0:
 		return
 
-	voxel_data.voxel_ids.clear()
-	voxel_data.voxel_density.clear()
-	voxel_data.voxel_colors.clear()
+	voxel_data.voxel_ids[index] = 0
+	voxel_data.voxel_density[index] = 0
+	voxel_data.voxel_colors[index] = 0
 
 	#update_surface_cache(voxel_data)
-	voxel_data.mark_dirty()
 
 
 func restore_voxel(
@@ -48,20 +44,14 @@ func restore_voxel(
 
 	if not is_instance_valid(voxel_data):
 		return
-
-
 	if voxel_data.original_voxel_ids[index] == 0:
 		return
-
-	if voxel_data.voxel_ids.get(index) != 0:
+	if voxel_data.voxel_ids[index] != 0:
 		return
 
-	voxel_data.voxel_ids.append(voxel_data.original_voxel_ids.get(index))
-	voxel_data.voxel_density.append(voxel_data.original_voxel_density.get(index))
-	voxel_data.voxel_colors.append(voxel_data.original_voxel_colors.get(index))
-
-	#update_surface_cache(chunk)
-	#voxel_data.mark_dirty()
+	voxel_data.voxel_ids[index] = voxel_data.original_voxel_ids[index]
+	voxel_data.voxel_density[index] = voxel_data.original_voxel_density[index]
+	voxel_data.voxel_colors[index] = voxel_data.original_voxel_colors[index]
 
 
 func clear_voxel_data(voxel_data: VoxelData) -> void:

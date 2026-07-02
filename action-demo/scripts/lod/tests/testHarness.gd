@@ -19,6 +19,7 @@ func register_test(test: BaseVoxelTest) -> void:
 
 
 func register_suite():
+	
 	register_test(VoxelDataControllerTest.new())
 	register_test(FailureTest.new())
 	
@@ -58,8 +59,6 @@ func _execute_test(test: BaseVoxelTest) -> void:
 	# Execute
 	#
 	test.setup()
-
-	var run_failed := false
 
 	# Godot currently has no try/finally.
 	# We explicitly separate execution and cleanup so cleanup

@@ -57,10 +57,7 @@ func validate() -> bool:
 
 
 func cleanup() -> void:
-
-	if is_instance_valid(data):
-		data = null
-
+#	voxels are RefCount
 	controller = null
 	data = null
 
