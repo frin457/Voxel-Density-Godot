@@ -1,0 +1,16 @@
+class_name MeshSnapshotController extends RefCounted
+
+func create_snapshot(
+	voxel_data: VoxelData,
+	grid: VoxelGridInfo
+) -> MeshSnapshot:
+	var snapshot := MeshSnapshot.new()
+
+	snapshot.voxel_ids = voxel_data.voxel_ids.duplicate()
+	snapshot.voxel_colors = voxel_data.voxel_colors.duplicate()
+
+	snapshot.chunk_size = grid.chunk_size
+	snapshot.chunk_size_sq = grid.chunk_size_sq
+	snapshot.voxel_scale = grid.voxel_scale
+
+	return snapshot
