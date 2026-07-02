@@ -5,7 +5,8 @@ class_name Chunk extends StaticBody3D
 # ==================================================
 
 var manager: ChunkManager
-
+var voxel_data:= VoxelData.new()
+var grid_info := VoxelGridInfo.new()
 var parent_chunk: Chunk = null
 var child_chunks: Array[Chunk] = []
 
@@ -22,19 +23,19 @@ var subdivision_pending := false
 var merge_pending := false
 
 # ==================================================
-# SCENE REFERENCES (KEEP FOR NOW - STRUCTURAL DEPENDENCY)
+# SCENE REFERENCES 	
 # ==================================================
 
 @onready var collisionShape: CollisionShape3D = $CollisionShape3D
 @onready var meshInstance: MeshInstance3D = $MeshInstance3D
 
 # ==================================================
-# CONFIG (KEEP)
+# CONFIG
 # ==================================================
 
-@export var chunk_size := 32
-var chunk_size_sq := 1024
-var voxel_size := 1.0
+@export var chunk_size := grid_info.chunk_size
+var chunk_size_sq := grid_info.chunk_size_sq
+var voxel_size := grid_info.voxel_size
 
 # ==================================================
 # INITIALIZATION
@@ -46,7 +47,7 @@ func _ready() -> void:
 		meshInstance.mesh = ArrayMesh.new()
 
 # ==================================================
-# LIFECYCLE (KEEP - CORE CONTRACT)
+# LIFECYCLE (CORE CONTRACT)
 # ==================================================
 
 func activate() -> void:
@@ -74,7 +75,7 @@ func deactivate() -> void:
 		collisionShape.set_deferred("disabled", true) 
 
 # ==================================================
-# RESET (KEEP - CORE POOL CONTRACT)
+# RESET (POOL CONTRACT)
 # ==================================================
 
 func reset() -> void:
@@ -92,7 +93,7 @@ func reset() -> void:
 	collision_dirty = false
 	
 # ==================================================
-# DIRTY STATE (KEEP - CORE SIGNAL CONTRACT)
+# DIRTY STATE (SIGNAL CONTRACT)
 # ==================================================
 
 func mark_dirty() -> void:

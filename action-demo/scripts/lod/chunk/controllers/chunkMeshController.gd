@@ -3,27 +3,23 @@ class_name ChunkMeshController extends RefCounted
 var active_mesher: BaseMesher = StandardMesher.new()
 
 # Internal State Tracking (Moved from Chunk)
-var cooking_chunks: Dictionary = {}
-var stale_chunks: Dictionary = {}
-var pending_surfaces: Dictionary = {}
+var cooking_chunks : Dictionary = {}
+var stale_chunks : Dictionary = {}
+var pending_surfaces : Dictionary = {}
 
-func rebuild(chunk: Chunk) -> void:
+func rebuild(
+	chunk: Chunk,
+	snapshot: MeshSnapshot
+) -> void:
+
 	if not is_instance_valid(chunk):
 		return
 
-	# Check internal controller state instead of chunk state
 	if cooking_chunks.has(chunk):
 		stale_chunks[chunk] = true
 		return
 
 	cooking_chunks[chunk] = true
-
-	var snapshot := MeshSnapshot.new()
-	snapshot.voxel_ids = chunk.voxel_ids.duplicate()
-	snapshot.voxel_colors = chunk.voxel_colors.duplicate()
-	snapshot.chunk_size = chunk.chunk_size
-	snapshot.chunk_size_sq = chunk.chunk_size_sq
-	snapshot.voxel_scale = chunk.voxel_size
 
 	WorkerThreadPool.add_task(
 		_generate_mesh.bind(chunk, snapshot),
@@ -36,18 +32,14 @@ func _generate_mesh(
 	chunk: Chunk,
 	snapshot: MeshSnapshot
 ) -> void:
-	if not is_instance_valid(chunk):
-		return
-		
+
 	var arrays = active_mesher.generate_mesh_data(snapshot)
-	
+
 	if not is_instance_valid(chunk):
 		return
-		
-	# Store surface arrays in the controller, not the chunk
+
 	pending_surfaces[chunk] = arrays
-	
-	# Route the completion callback back to this controller
+
 	_mesh_complete.call_deferred(chunk)
 
 

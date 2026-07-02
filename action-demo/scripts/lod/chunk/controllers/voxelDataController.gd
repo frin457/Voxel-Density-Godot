@@ -1,5 +1,4 @@
-# ./scripts/lod/engine/voxelDataController.gd
-
+#./scripts/lod/chunk/surfaces/voxels/voxelDataController.gd
 class_name VoxelDataController
 extends RefCounted
 
@@ -100,7 +99,8 @@ func clear_voxel_data(voxel_data: VoxelData) -> void:
 	#]
 #
 	#var quadrants_completed := 0
-#
+## TODO VOX-312
+	# Replace direct voxel access with VoxelDataController API.
 	#var half_size := int(chunk.chunk_size / 2)
 	#var size := chunk.chunk_size
 	#var size_sq := chunk.chunk_size_sq
@@ -118,10 +118,12 @@ func clear_voxel_data(voxel_data: VoxelData) -> void:
 			#for x in range(size):
 #
 				#var index = x + y_offset + z_offset
-#
+## TODO VOX-312
+	# Replace direct voxel access with VoxelDataController API.
 				#if chunk.voxel_ids[index] == 0:
 					#continue
-#
+## TODO VOX-312
+	# Replace direct voxel access with VoxelDataController API.
 				#chunk.is_empty_air = false
 #
 				#var q_x = 1 if x >= half_size else 0
@@ -141,6 +143,8 @@ func clear_voxel_data(voxel_data: VoxelData) -> void:
 			#break
 #
 	#for i in range(8):
+	# TODO VOX-312
+	# Replace direct voxel access with VoxelDataController API.
 		#chunk.sub_quadrant_has_surfaces[q_keys[i]] = q_found[i]
 
 

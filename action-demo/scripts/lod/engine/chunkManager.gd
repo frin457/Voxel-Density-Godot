@@ -208,7 +208,7 @@ func process_chunk(chunk: Chunk) -> void:
 	dirty_queue_processed_this_frame += 1
 	# Run the meshing controller pass
 	if chunk.mesh_dirty:
-		mesh_controller.rebuild(chunk)
+		mesh_controller.rebuild(chunk, snapshot)
 		chunk_mesh_finished.emit(chunk.chunk_coordinate)
 
 func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
@@ -250,6 +250,8 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 
 	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
 	var chunk: Chunk = acquire_chunk() 
+	# TODO VOX-312
+	# Replace direct voxel access with VoxelDataController API.
 	chunk.manager = self
 	chunk.position = job.world_position
 	chunk.voxel_size = local_voxel_scale
@@ -263,7 +265,9 @@ func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
 		chunk.deactivate()
 
 	chunks[key] = chunk
-	voxel_data_controller.set_voxel_data(chunk,job.data)
+	# TODO VOX-312
+	# Replace direct voxel access with VoxelDataController API.
+	voxel_data_controller.set_voxel_data(chunk.voxel_data,job.data)
 	_link_subdivision_hierarchy(coord, chunk)
 
 
