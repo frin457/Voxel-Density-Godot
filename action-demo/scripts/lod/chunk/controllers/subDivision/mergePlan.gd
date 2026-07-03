@@ -1,5 +1,5 @@
 #./scripts/lod/chunk/controllers/subDivision/merge.gd
-class_name Merge extends RefCounted
+class_name MergePlan extends RefCounted
 
 var parent_coordinate: Vector3i
 var parent_lod: int

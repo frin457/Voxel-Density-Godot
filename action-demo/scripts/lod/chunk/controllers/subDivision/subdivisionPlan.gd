@@ -1,5 +1,5 @@
 #./scripts/lod/chunk/controllers/subDivision/subdivision.gd
-class_name Subdivision extends RefCounted
+class_name SubdivisionPlan extends RefCounted
 
 var parent_coordinate: Vector3i
 var parent_lod: int

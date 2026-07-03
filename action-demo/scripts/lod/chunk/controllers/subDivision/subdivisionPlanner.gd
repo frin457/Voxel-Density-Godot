@@ -7,9 +7,9 @@ func create_plan(
 	parent_world_position: Vector3,
 	target_lod: int,
 	grid: VoxelGridInfo
-) -> Subdivision:
+) -> SubdivisionPlan:
 
-	var plan := Subdivision.new()
+	var plan := SubdivisionPlan.new()
 
 	plan.parent_coordinate = parent_coordinate
 	plan.parent_lod = target_lod - 1

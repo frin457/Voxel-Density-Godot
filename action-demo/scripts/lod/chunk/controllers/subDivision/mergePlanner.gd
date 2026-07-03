@@ -5,9 +5,9 @@ class_name MergePlanner extends RefCounted
 func create_plan(
 	parent_coordinate: Vector3i,
 	parent_lod: int
-) -> Merge:
+) -> MergePlan:
 
-	var plan := Merge.new()
+	var plan := MergePlan.new()
 
 	plan.parent_coordinate = parent_coordinate
 	plan.parent_lod = parent_lod
@@ -21,24 +21,11 @@ func create_plan(
 					+ Vector3i(x, y, z)
 				)
 
-				var child_key := _chunk_key(
-					child_coord,
-					parent_lod + 1
-				)
+				var identifier := ChunkIdentifier.new()
 
-				plan.child_keys.append(child_key)
+				identifier.coordinate = child_coord
+				identifier.lod_level = parent_lod + 1
+
+				plan.child_keys.append(identifier)
 
 	return plan
-
-
-func _chunk_key(
-	coord: Vector3i,
-	lod: int
-) -> String:
-
-	return "%d_%d_%d_LOD%d" % [
-		coord.x,
-		coord.y,
-		coord.z,
-		lod
-	]
