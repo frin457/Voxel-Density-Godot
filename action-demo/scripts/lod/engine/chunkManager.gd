@@ -9,10 +9,9 @@ class_name ChunkManager extends Node
 @export var chunk_material: Material
 @export var chunk_size: int = 16
 var         chunk_lod_size: float  = float(chunk_size) * voxel_scale
-var         inactive_chunks: Array[Chunk] = []
 
 # World Building Controllers
-var terrain_generator := TerrainGenerationController.new()
+var terrain_generator := TerrainGenerator.new()
 var mesh_controller := ChunkMeshController.new()
 var voxel_data_controller := VoxelDataController.new()
 
@@ -39,7 +38,7 @@ var collision_queue: Array[Chunk] = []
 const MAX_COLLISIONS_PER_FRAME := 2
 
 # World state - Accepts compound keys or Vector4i equivalent strings
-var chunks: Dictionary = {}
+var registry:= ChunkRegistry.new()
 var total_chunks: Vector3i
 
 # Tracks the maximum allowed LOD level for any base chunk column to prevent stale threads from spawning orphaned nodes
@@ -390,11 +389,12 @@ func queue_collision_chunk(chunk: Chunk) -> void:
 # ==================================================
 func acquire_chunk() -> Chunk:
 	var chunk: Chunk
-	if inactive_chunks.is_empty():
+	var pool := ChunkPool.new(chunk_scene)
+	if pool.is_empty():
 		chunk = chunk_scene.instantiate()
 		add_child(chunk) # Keep it in the scene tree permanently
 	else:
-		chunk = inactive_chunks.pop_back()
+		pool = inactive_chunks.pop_back()
 	
 	chunk.reset()
 	return chunk

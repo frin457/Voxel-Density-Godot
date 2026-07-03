@@ -1,67 +1,51 @@
 # ./scripts/lod/chunk/chunkRegistry.gd
-
-class_name ChunkRegistry extends RefCounted
+class_name ChunkRegistry
+extends RefCounted
 
 var _chunks: Dictionary = {}
 
+# ==================================================
+# PUBLIC API
+# ==================================================
 
-func add_chunk(chunk: Chunk) -> void:
-	if !is_instance_valid(chunk):
+func register_chunk(chunk: Chunk) -> void:
+	if not is_instance_valid(chunk):
 		return
 
-	_chunks[get_key(
+	_chunks[_get_key(
 		chunk.chunk_coordinate,
 		chunk.lod_level
 	)] = chunk
 
 
-func remove_chunk(
+func has_chunk(
 	coordinate: Vector3i,
-	lod_level: int
-) -> void:
-
-	_chunks.erase(
-		get_key(
-			coordinate,
-			lod_level
-		)
-	)
-
-
-func remove(chunk: Chunk) -> void:
-
-	if !is_instance_valid(chunk):
-		return
-
-	remove_chunk(
-		chunk.chunk_coordinate,
-		chunk.lod_level
-	)
-
-
-func find_chunk(
-	coordinate: Vector3i,
-	lod_level: int
-) -> Chunk:
-
-	return _chunks.get(
-		get_key(
-			coordinate,
-			lod_level
-		)
-	)
-
-
-func contains(
-	coordinate: Vector3i,
-	lod_level: int
+	lod: int
 ) -> bool:
 
 	return _chunks.has(
-		get_key(
-			coordinate,
-			lod_level
-		)
+		_get_key(coordinate, lod)
+	)
+
+
+func get_chunk(
+	coordinate: Vector3i,
+	lod: int
+) -> Chunk:
+
+	return _chunks.get(
+		_get_key(coordinate, lod),
+		null
+	)
+
+
+func remove_chunk(
+	coordinate: Vector3i,
+	lod: int
+) -> void:
+
+	_chunks.erase(
+		_get_key(coordinate, lod)
 	)
 
 
@@ -69,22 +53,30 @@ func clear() -> void:
 	_chunks.clear()
 
 
-func size() -> int:
-	return _chunks.size()
-
-
 func values() -> Array:
 	return _chunks.values()
 
 
-func get_key(
+func size() -> int:
+	return _chunks.size()
+
+
+func is_empty() -> bool:
+	return _chunks.is_empty()
+
+
+# ==================================================
+# PRIVATE
+# ==================================================
+
+func _get_key(
 	coordinate: Vector3i,
-	lod_level: int
+	lod: int
 ) -> String:
 
 	return "%d_%d_%d_LOD%d" % [
 		coordinate.x,
 		coordinate.y,
 		coordinate.z,
-		lod_level
+		lod
 	]

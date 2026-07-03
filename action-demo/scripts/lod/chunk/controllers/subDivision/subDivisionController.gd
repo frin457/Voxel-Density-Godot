@@ -1,7 +1,7 @@
 # ./scripts/lod/engine/subDivisionController.gd
 class_name SubdivisionController extends RefCounted
 
-var manager: ChunkManager
+var registry
 
 func _init(_manager: ChunkManager) -> void:
 	manager = _manager
@@ -9,10 +9,10 @@ func _init(_manager: ChunkManager) -> void:
 func request_subdivision(coord: Vector3i, target_level: int) -> void:
 	var key = manager.get_chunk_key(coord, target_level - 1)
 	
-	if not manager.chunks.has(key):
+	if not manager.registry.has(key):
 		return
 
-	var parent_chunk = manager.chunks[key]
+	var parent_chunk = manager.registry[key]
 
 	if parent_chunk.subdivision_pending:
 		return
@@ -45,10 +45,10 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 func subdivision_complete(parent_coord: Vector3i, lod: int) -> void:
 	var parent_key = manager.get_chunk_key(parent_coord, lod - 1)
 	
-	if not manager.chunks.has(parent_key):
+	if not registry.get_chunk(parent_key):
 		return
 		
-	var parent_chunk = manager.chunks[parent_key]
+	var parent_chunk = manager.registry[parent_key]
 	parent_chunk.subdivision_pending = false
 	
 	parent_chunk.current_lod = lod
@@ -63,10 +63,10 @@ func subdivision_complete(parent_coord: Vector3i, lod: int) -> void:
 func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 	var parent_key = manager.get_chunk_key(parent_coord, parent_level)
 	
-	if not manager.chunks.has(parent_key):
+	if not manager.registry.has(parent_key):
 		return
 		
-	var parent_chunk = manager.chunks[parent_key]
+	var parent_chunk = manager.registry[parent_key]
 
 	if parent_chunk.merge_pending:
 		return
@@ -83,8 +83,8 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 				var child_coord = (parent_coord * 2) + Vector3i(x, y, z)
 				var child_key = manager.get_chunk_key(child_coord, parent_level + 1)
 				
-				if manager.chunks.has(child_key):
-					var child_chunk = manager.chunks[child_key]
+				if manager.registry.has(child_key):
+					var child_chunk = manager.registry[child_key]
 					child_chunk.subdivision_pending = false
 					child_chunk.merge_pending = false
 
@@ -117,9 +117,9 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		manager.chunks.erase(child_key)
+		manager.registry.erase(child_key)
 		parent_chunk.child_chunks.erase(child)
-		manager.release_chunk(child)
+		manager.pool.release(child)
 
 	parent_chunk.child_chunks.clear()
 
@@ -141,8 +141,8 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 			manager.diagnostics.log_late_arrival(chunk.chunk_coordinate)
 			
 		var child_key = manager.get_chunk_key(chunk.chunk_coordinate, chunk.lod_level)
-		manager.chunks.erase(child_key)
-		manager.release_chunk(chunk)
+		manager.registry.erase(child_key)
+		manager.pool.release(chunk)
 		return
 	
 	var all_siblings_ready := true

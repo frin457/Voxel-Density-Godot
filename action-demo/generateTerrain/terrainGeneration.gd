@@ -59,7 +59,9 @@ func generate(
 
 				voxel_data.voxel_ids[index] = 1
 				voxel_data.voxel_density[index] = 255
-
+				#Guard Clause, if no colors chosen
+				if color_palette.is_empty():
+					return voxel_data
 				voxel_data.voxel_colors[index] = color_palette[color_index % color_count]
 
 	return voxel_data

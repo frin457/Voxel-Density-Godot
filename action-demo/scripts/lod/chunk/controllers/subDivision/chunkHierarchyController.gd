@@ -49,34 +49,33 @@ func clear_children(parent: Chunk) -> void:
 
 
 func remove_descendants(
-	manager: ChunkManager,
-	parent: Chunk
+	registry,
+	pool,
+	parent
 ) -> void:
 
 	if not is_instance_valid(parent):
 		return
 
-	var children := parent.child_chunks.duplicate()
+	var children : Array[Chunk] = parent.child_chunks.duplicate()
 
 	for child in children:
 
 		if not is_instance_valid(child):
 			continue
 
-		remove_descendants(manager, child)
+		remove_descendants(registry, pool, child)
 
 		detach_child(parent, child)
 
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		manager.chunks.erase(
-			manager.get_chunk_key(
-				child.chunk_coordinate,
-				child.lod_level
-			)
+		registry.remove(
+			child.chunk_coordinate,
+			child.lod_level
 		)
 
-		manager.release_chunk(child)
+		pool.release(child)
 
 	parent.child_chunks.clear()
