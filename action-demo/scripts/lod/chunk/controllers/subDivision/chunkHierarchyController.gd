@@ -49,8 +49,8 @@ func clear_children(parent: Chunk) -> void:
 
 
 func remove_descendants(
-	registry,
-	pool,
+	registry : ChunkRegistry,
+	pool : ChunkPool,
 	parent
 ) -> void:
 
@@ -71,7 +71,7 @@ func remove_descendants(
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		registry.remove(
+		registry.remove_chunk(
 			child.chunk_coordinate,
 			child.lod_level
 		)

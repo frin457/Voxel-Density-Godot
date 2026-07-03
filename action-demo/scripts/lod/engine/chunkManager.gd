@@ -63,9 +63,6 @@ var random := FastNoiseLite.new()
 var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
 
 # Helper to build an octree safe identifier key
-func get_chunk_key(coord: Vector3i, lod: int) -> String:
-	return "%d_%d_%d_LOD%d" % [coord.x, coord.y, coord.z, lod]
-
 
 # Helper methods to manage authorized structural LOD levels
 func set_authorized_lod(base_coord: Vector3i, max_lod: int) -> void:
