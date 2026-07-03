@@ -14,8 +14,8 @@ func snapshot() -> Dictionary:
 	var collision_cooking := 0
 	
 	# Aggregate live inner-chunk states dynamically to prevent mixing tracking logic into Chunk code
-	if context and context.chunks:
-		for chunk in context.chunks.values():
+	if context and context.registry.values():
+		for chunk in context.registry.values():
 			if is_instance_valid(chunk):
 				if chunk.subdivision_pending:
 					pending_subdivisions += 1
@@ -27,8 +27,8 @@ func snapshot() -> Dictionary:
 					collision_cooking += 1
 
 	return {
-		"Chunks": context.chunks.size() if context else 0,
-		"Pool": context.inactive_chunks.size() if context else 0,
+		"Chunks": context.registry.size() if context else 0,
+		"Pool": context.pool.size() if context else 0,
 		"Worker Threads": context.active_thread_tasks.size() if context else 0,
 		"Dirty Queue": context.dirty_queue.size() if context else 0,
 		"Collision Queue": context.collision_queue.size() if context else 0,

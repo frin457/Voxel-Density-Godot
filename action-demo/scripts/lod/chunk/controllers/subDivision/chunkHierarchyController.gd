@@ -50,7 +50,7 @@ func clear_children(parent: Chunk) -> void:
 
 func remove_descendants(
 	context: EngineContext,
-	parent
+	parent: Chunk
 ) -> void:
 
 	if not is_instance_valid(parent):
