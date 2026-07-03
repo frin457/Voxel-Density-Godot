@@ -48,3 +48,7 @@ var is_dev := false
 #==================================================
 
 var authorized_lod_levels : Dictionary = {}
+var active_thread_tasks : Array[int]
+var dirty_queue : Array[Chunk]
+var collision_queue : Array[Chunk]
+	var chunk_lod_size : float

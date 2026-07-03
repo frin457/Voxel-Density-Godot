@@ -1,10 +1,10 @@
 #./scripts/lod/debug/diagnosticController.gd.gd
 class_name DiagnosticsController extends RefCounted
 
-var manager: ChunkManager
+var context: EngineContext
 
-func _init(_manager: ChunkManager) -> void:
-	manager = _manager
+func _init(_context: EngineContext) -> void:
+	context = _context
 
 ## Compiles and returns a structural snapshot of current live engine parameters
 func snapshot() -> Dictionary:
@@ -14,8 +14,8 @@ func snapshot() -> Dictionary:
 	var collision_cooking := 0
 	
 	# Aggregate live inner-chunk states dynamically to prevent mixing tracking logic into Chunk code
-	if manager and manager.chunks:
-		for chunk in manager.chunks.values():
+	if context and context.chunks:
+		for chunk in context.chunks.values():
 			if is_instance_valid(chunk):
 				if chunk.subdivision_pending:
 					pending_subdivisions += 1
@@ -27,12 +27,11 @@ func snapshot() -> Dictionary:
 					collision_cooking += 1
 
 	return {
-		"Chunks": manager.chunks.size() if manager else 0,
-		"Pool": manager.inactive_chunks.size() if manager else 0,
-		"Scene Children": manager.get_child_count() if manager else 0,
-		"Worker Threads": manager.active_thread_tasks.size() if manager else 0,
-		"Dirty Queue": manager.dirty_queue.size() if manager else 0,
-		"Collision Queue": manager.collision_queue.size() if manager else 0,
+		"Chunks": context.chunks.size() if context else 0,
+		"Pool": context.inactive_chunks.size() if context else 0,
+		"Worker Threads": context.active_thread_tasks.size() if context else 0,
+		"Dirty Queue": context.dirty_queue.size() if context else 0,
+		"Collision Queue": context.collision_queue.size() if context else 0,
 		"Pending Subdivisions": pending_subdivisions,
 		"Pending Merges": pending_merges,
 		"Mesh Cooking": mesh_cooking,

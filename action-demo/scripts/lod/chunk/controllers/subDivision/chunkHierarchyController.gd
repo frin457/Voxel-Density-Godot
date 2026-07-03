@@ -1,4 +1,4 @@
-#./scripts/lod/chunk/controllers/subDivision/activationController.gd
+#./scripts/lod/chunk/controllers/subDivision/chunkHierarchyController.gd
 class_name ChunkHierarchyController extends RefCounted
 
 
@@ -49,8 +49,7 @@ func clear_children(parent: Chunk) -> void:
 
 
 func remove_descendants(
-	registry : ChunkRegistry,
-	pool : ChunkPool,
+	context: EngineContext,
 	parent
 ) -> void:
 
@@ -64,18 +63,18 @@ func remove_descendants(
 		if not is_instance_valid(child):
 			continue
 
-		remove_descendants(registry, pool, child)
+		remove_descendants(context, child)
 
 		detach_child(parent, child)
 
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		registry.remove_chunk(
+		context.registry.remove_chunk(
 			child.chunk_coordinate,
 			child.lod_level
 		)
 
-		pool.release(child)
+		context.pool.release(child)
 
 	parent.child_chunks.clear()
