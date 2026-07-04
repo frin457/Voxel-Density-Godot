@@ -1,46 +1,44 @@
-# ./scripts/lod/chunk/pool/chunkPool.gd
-
+#./scripts/lod/chunk/chunkPool.gd
 class_name ChunkPool extends RefCounted
 
-
-var scene: PackedScene
+var scene : PackedScene
+var scene_root : Node
 
 var inactive_chunks : Array[Chunk] = []
 
 
-func _init(chunk_scene: PackedScene) -> void:
+func _init(
+	chunk_scene: PackedScene,
+	root: Node
+) -> void:
+
 	scene = chunk_scene
+	scene_root = root
 
 
 func acquire() -> Chunk:
+	var chunk : Chunk
 
 	if inactive_chunks.is_empty():
-		return scene.instantiate()
-
-	var chunk : Chunk = inactive_chunks.pop_back()
-
+		chunk = scene.instantiate()
+		scene_root.add_child(chunk)
+	else:
+		chunk = inactive_chunks.pop_back()
 	chunk.reset()
 
 	return chunk
 
 
-func release(
-	chunk: Chunk
-) -> void:
-
-	if !is_instance_valid(chunk):
+func release(chunk: Chunk) -> void:
+	if not is_instance_valid(chunk):
 		return
 
 	chunk.reset()
-
-	if chunk.get_parent():
-		chunk.get_parent().remove_child(chunk)
-
+	chunk.deactivate()
 	inactive_chunks.append(chunk)
 
 
 func clear() -> void:
-
 	for chunk in inactive_chunks:
 		if is_instance_valid(chunk):
 			chunk.queue_free()
@@ -50,3 +48,7 @@ func clear() -> void:
 
 func available() -> int:
 	return inactive_chunks.size()
+
+
+func is_empty() -> bool:
+	return inactive_chunks.is_empty()
