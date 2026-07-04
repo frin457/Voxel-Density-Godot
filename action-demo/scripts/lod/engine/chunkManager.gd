@@ -69,9 +69,8 @@ signal subdivision_requested(coord: Vector3i, target_level: int, wave_index: int
 signal merge_requested(coord: Vector3i)
 
 signal generation_requested()
-signal generation_completed()
-
-signal chunk_mesh_finished(coord: Vector3i)
+#signal generation_completed()
+#signal chunk_mesh_finished(coord: Vector3i)
 
 # ==================================================
 # LIFECYCLE
@@ -148,7 +147,7 @@ func _ready() -> void:
 	generation_requested.emit.call_deferred()
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	thread_manager.process()
 
 # ==================================================

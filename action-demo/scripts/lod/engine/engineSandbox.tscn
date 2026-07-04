@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://whkb060m4ool"]
+
+[ext_resource type="Script" uid="uid://crantc20sjpad" path="res://scripts/lod/engine/chunkManager.gd" id="1_r3hnh"]
+
+[node name="EngineSandbox" type="Node2D" unique_id=1309928331]
+
+[node name="chunkManager" type="Node" parent="." unique_id=1184542629]
+script = ExtResource("1_r3hnh")
+dimensions = Vector3(64, 32, 64)
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=33363768]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=103030739]
+
+[node name="world" type="Node" parent="." unique_id=451417493]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=18190319]
