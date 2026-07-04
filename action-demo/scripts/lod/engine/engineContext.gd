@@ -9,10 +9,13 @@ var is_dev := false
 var registry : ChunkRegistry
 var pool : ChunkPool
 
-var mesh_controller : ChunkMeshController
-var collision_controller : CollisionController
 var voxel_controller : VoxelDataController
 var terrain_generator : TerrainGenerator
+
+var dirty_processor : DirtyChunkProcessor
+var collision_processor : CollisionProcessor
+var mesh_controller : ChunkMeshController
+var collision_controller : CollisionController
 
 var subdivision_planner : SubdivisionPlanner
 var merge_planner : MergePlanner
