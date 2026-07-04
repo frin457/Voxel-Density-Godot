@@ -1,15 +1,20 @@
 #./scripts/lod/engine/engineContext.gd
 class_name EngineContext extends RefCounted
 var is_dev := false
+#==================================================
+# ENGINE STATE
+#==================================================
+var manager : ChunkManager
+var scene_root : Node
 
 #==================================================
 # ENGINE SERVICES
 #==================================================
-
 var registry : ChunkRegistry
 var pool : ChunkPool
+var chunk_instantiator : ChunkInstantiationController
 
-var voxel_controller : VoxelDataController
+var voxel_data_controller : VoxelDataController
 var terrain_generator : TerrainGenerator
 
 var dirty_processor : DirtyChunkProcessor
@@ -28,12 +33,14 @@ var diagnostics : DiagnosticsController
 # WORK QUEUES
 #==================================================
 
-var job_queue : ChunkJobQueue
+var job_queue := ChunkJobQueue.new()
+var active_thread_tasks : Array[int] = []
+var dirty_queue : Array[Chunk] = []
+var collision_queue : Array[Chunk] = []
 
 #==================================================
 # CONFIGURATION
 #==================================================
-
 var chunk_scene : PackedScene
 
 var chunk_size : int
@@ -43,16 +50,13 @@ var max_world_height : float
 var colors : Array[Color]
 var noise : Noise
 
+var dimensions : Vector3
+var voxel_scale : float
+var chunk_material : Material
+var worker_count : int
+
 #==================================================
 # THREAD STATE
 #==================================================
-
 var authorized_lod_levels : Dictionary = {}
 var chunk_lod_size : float
-
-#==================================================
-# QUEUES
-#==================================================
-var active_thread_tasks : Array[int]
-var dirty_queue : Array[Chunk]
-var collision_queue : Array[Chunk]

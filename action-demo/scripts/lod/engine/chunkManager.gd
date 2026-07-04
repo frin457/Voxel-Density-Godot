@@ -1,24 +1,22 @@
-#./scripts/lod/chunk/chunkManager.gd
-class_name ChunkManager extends Node
+# ./scripts/lod/chunk/chunkManager.gd
 
-# Global Parameters 
+class_name ChunkManager
+extends Node
+
+# ==================================================
+# CONFIGURATION
+# ==================================================
+
 @export var isDev: bool = false
-@export var workerCount: int = 4
-@export var dimensions: Vector3 = Vector3(128, 64, 128)
-@export var voxel_scale: float = 1.0
+@export var workerCount := 4
+
+@export var dimensions := Vector3(128, 64, 128)
+
+@export var voxel_scale := 1.0
+@export var chunk_size := 16
 @export var chunk_material: Material
-@export var chunk_size: int = 16
-var         chunk_lod_size: float  = float(chunk_size) * voxel_scale
 
-# World Building Controllers
-var terrain_generator := TerrainGenerator.new()
-var mesh_controller := ChunkMeshController.new()
-var voxel_data_controller := VoxelDataController.new()
-
-# LOD Engine Controllers
-var collision_controller := CollisionController.new()
-var subdivision_controller:= SubdivisionController.new(self)
-var diagnostics := DiagnosticsController.new(self)
+var chunk_lod_size: float
 
 @export var colors: Array[Color] = [
 	Color.GRAY,
@@ -29,434 +27,207 @@ var diagnostics := DiagnosticsController.new(self)
 	Color.GREEN_YELLOW
 ]
 
-# Job / update systems
-var job_queue := ChunkJobQueue.new()
-var dirty_queue: Array[Chunk] = []
-var collision_queue: Array[Chunk] = []
+#==================================================
+# SCENE
+#==================================================
 
-@export var max_dirty_queue_per_frame := 8
-const MAX_COLLISIONS_PER_FRAME := 2
+var scene_root : Node
 
-# World state - Accepts compound keys or Vector4i equivalent strings
-var registry:= ChunkRegistry.new()
-var total_chunks: Vector3i
+# ==================================================
+# ENGINE CONTEXT
+# ==================================================
 
-# Tracks the maximum allowed LOD level for any base chunk column to prevent stale threads from spawning orphaned nodes
-var authorized_lod_levels: Dictionary = {}
+var context: EngineContext
 
-# Initial generation state synchronization tracking
-var initial_generation_cooked: bool = false
+# ==================================================
+# CONTROLLERS
+# ==================================================
 
-# Active asynchronous thread tracking array
-var active_thread_tasks: Array[int] = []
+var terrain_generator := TerrainGenerator.new()
+var voxel_data_controller := VoxelDataController.new()
 
-# Entry points for ANY external script 
-# TODO: Review these signals pattern    
+var registry := ChunkRegistry.new()
+var pool := ChunkPool
+
+var hierarchy: ChunkHierarchyController
+var diagnostics: DiagnosticsController
+
+var thread_manager: ThreadManager
+var subdivision_controller: SubdivisionController
+var world_generation_controller: WorldGenerationController
+
+var queue_controller: QueueController
+var dirty_processor: DirtyChunkProcessor
+var collision_processor: CollisionProcessor
+var chunk_instantiator: ChunkInstantiationController
+
+# ==================================================
+# SIGNALS
+# ==================================================
+
 signal subdivision_requested(coord: Vector3i, target_level: int, wave_index: int)
 signal merge_requested(coord: Vector3i)
+
 signal generation_requested()
 signal generation_completed()
+
 signal chunk_mesh_finished(coord: Vector3i)
 
-var dirty_queue_processed_this_frame := 0
-var random := FastNoiseLite.new()
-var chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
+# ==================================================
+# LIFECYCLE
+# ==================================================
 
-# Helper to build an octree safe identifier key
+func _ready() -> void:
+	
+	chunk_lod_size = float(chunk_size) * voxel_scale
 
-# Helper methods to manage authorized structural LOD levels
-func set_authorized_lod(base_coord: Vector3i, max_lod: int) -> void:
-	authorized_lod_levels[base_coord] = max_lod
+	_sanitize_world_settings()
 
-func get_authorized_lod(base_coord: Vector3i) -> int:
-	return authorized_lod_levels.get(base_coord, 0)
+	context = EngineContext.new()
+	context.scene_root = self
+	#context.chunk_scene = chunk_scene
 
-# ----------------------------
-# READY & LIFECYCLE
-# ----------------------------
-	subdivision_requested.connect(subdivision_controller.request_subdivision)
-	merge_requested.connect(subdivision_controller.request_merge)
-	generation_requested.connect(start_world_generation)
+	context.pool = ChunkPool.new(
+		context.chunk_scene,
+		context.scene_root
+	)
 
-	# Automatically begin generation.
+	context.manager = self
+	context.scene_root = self
+
+	context.is_dev = isDev
+
+	context.dimensions = dimensions
+
+	context.chunk_size = chunk_size
+	context.chunk_lod_size = chunk_lod_size
+	context.voxel_scale = voxel_scale
+
+	context.chunk_material = chunk_material
+	context.colors = colors
+
+	context.worker_count = workerCount
+
+	context.registry = registry
+
+	context.terrain_generator = terrain_generator
+	context.voxel_data_controller = voxel_data_controller
+
+	hierarchy = ChunkHierarchyController.new()
+	context.hierarchy = hierarchy
+
+	diagnostics = DiagnosticsController.new(context)
+	context.diagnostics = diagnostics
+
+	thread_manager = ThreadManager.new(context)
+
+	queue_controller = QueueController.new(context)
+
+	dirty_processor = DirtyChunkProcessor.new(context)
+
+	collision_processor = CollisionProcessor.new(context)
+
+	chunk_instantiator = ChunkInstantiationController.new(context)
+
+	subdivision_controller = SubdivisionController.new(context)
+
+	world_generation_controller = WorldGenerationController.new(context)
+
+	subdivision_requested.connect(
+		subdivision_controller.request_subdivision
+	)
+
+	merge_requested.connect(
+		subdivision_controller.request_merge
+	)
+
+	generation_requested.connect(
+		world_generation_controller.start_world_generation
+	)
+
 	generation_requested.emit.call_deferred()
 
 
-func _on_subdivision_requested(coord: Vector3i, lod_level: int) -> void:
-	subdivision_controller.request_subdivision(coord, lod_level)
+func _process(delta: float) -> void:
+	thread_manager.process()
+
+# ==================================================
+# PUBLIC API
+# ==================================================
+
+func set_authorized_lod(
+	base_coord: Vector3i,
+	max_lod: int
+) -> void:
+
+	context.authorized_lod_levels[base_coord] = max_lod
 
 
-## Hook: Subdivides all chunks touching a spherical radius
-func _on_structural_impact_area_requested(world_position: Vector3, radius: float) -> void:
-	
-	# Compute a bounding box in chunk-space coordinates
-	var min_chunk_x = int(floor((world_position.x - radius) / chunk_lod_size))
-	var max_chunk_x = int(floor((world_position.x + radius) / chunk_lod_size))
-	var min_chunk_z = int(floor((world_position.z - radius) / chunk_lod_size))
-	var max_chunk_z = int(floor((world_position.z + radius) / chunk_lod_size))
-	
-	# Force subdivision across the entire hit envelope
+func get_authorized_lod(
+	base_coord: Vector3i
+) -> int:
+
+	return context.authorized_lod_levels.get(base_coord, 0)
+
+
+func queue_dirty_chunk(chunk: Chunk) -> void:
+	queue_controller.queue_dirty(chunk)
+
+
+func queue_collision_chunk(chunk: Chunk) -> void:
+	queue_controller.queue_collision(chunk)
+
+# ==================================================
+# WORLD EVENTS
+# ==================================================
+
+func _on_subdivision_requested(
+	coord: Vector3i,
+	lod: int
+) -> void:
+
+	subdivision_controller.request_subdivision(
+		coord,
+		lod
+	)
+
+
+func _on_structural_impact_area_requested(
+	world_position: Vector3,
+	radius: float
+) -> void:
+
+	var min_chunk_x := int(
+		floor((world_position.x - radius) / chunk_lod_size)
+	)
+
+	var max_chunk_x := int(
+		floor((world_position.x + radius) / chunk_lod_size)
+	)
+
+	var min_chunk_z := int(
+		floor((world_position.z - radius) / chunk_lod_size)
+	)
+
+	var max_chunk_z := int(
+		floor((world_position.z + radius) / chunk_lod_size)
+	)
+
 	for x in range(min_chunk_x, max_chunk_x + 1):
 		for z in range(min_chunk_z, max_chunk_z + 1):
-			# Target chunk origin column at base level (LOD 0)
-			var target_coord = Vector3i(x, 0, z) 
-			subdivision_controller.request_subdivision(target_coord, 1)
+			subdivision_controller.request_subdivision(
+				Vector3i(x, 0, z),
+				1
+			)
 
+# ==================================================
+# INTERNAL
+# ==================================================
 
-# ----------------------------
-# WORLD SANITY + SAFETY
-# ----------------------------
 func _sanitize_world_settings() -> void:
+
 	dimensions = Vector3(
 		max(1.0, dimensions.x),
 		max(1.0, dimensions.y),
 		max(1.0, dimensions.z)
 	)
-
-	chunk_size = max(1, chunk_size)
-	total_chunks = Vector3i(
-		max(1, ceili(dimensions.x / chunk_lod_size)),
-		max(1, ceili(dimensions.y / chunk_lod_size)),
-		max(1, ceili(dimensions.z / chunk_lod_size))
-	)
-
-func _process(_delta: float) -> void:
-	
-	if isDev and Engine.get_frames_drawn() % 120 == 0:
-		diagnostics.print_formatted_snapshot()
-	job_queue.flush()
-
-	while job_queue.queue.size() > 0 and active_thread_tasks.size() < workerCount:
-		var job = job_queue.pop()
-		if job == null:
-			break
-			
-		var task_id = WorkerThreadPool.add_task(
-			_async_worker_execute.bind(job), 
-			true, 
-			"VoxelGenTask_%s" % get_chunk_key(job.chunk_coordinate, job.lod_level)
-		)
-		active_thread_tasks.append(task_id)
-
-	var i = active_thread_tasks.size() - 1
-	while i >= 0:
-		var task_id = active_thread_tasks[i]
-		if WorkerThreadPool.is_task_completed(task_id):
-			active_thread_tasks.remove_at(i)
-		i -= 1
-
-	# --- CONSUME DIRTY CHUNKS ---
-	if isDev and Engine.get_frames_drawn() % 120 == 0:
-		diagnostics.print_formatted_snapshot()
-		
-	var frame_start_time := Time.get_ticks_usec()
-	var max_allowed_budget_usec := 2500
-	
-	dirty_queue_processed_this_frame = 0
-	
-	if dirty_queue.size() > 128 and isDev:
-		push_warning("Voxel Engine Warning: Dirty queue backlog exceeds threshold! Count: ", dirty_queue.size())
-	if collision_queue.size() > 128 and isDev:
-		push_warning("Voxel Engine Warning: Collision queue backlog exceeds threshold! Count: ", collision_queue.size())
-
-	# SAFE WORKER CHECK: Verify budget BEFORE extracting items from our queue
-	while dirty_queue.size() > 0:
-		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
-			break # Exit smoothly; item remains safe at front of queue for next frame
-			
-		var chunk = dirty_queue.pop_front()
-		if is_instance_valid(chunk) and not chunk.is_queued_for_deletion():
-			process_chunk(chunk)
-
-	# --- CONSUME COLLISION QUEUE ---
-	var processed_collisions = 0
-	
-	while processed_collisions < MAX_COLLISIONS_PER_FRAME and not collision_queue.is_empty():
-		if Time.get_ticks_usec() - frame_start_time >= max_allowed_budget_usec:
-			break
-
-		var chunk = collision_queue.pop_front()
-
-		if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
-			continue
-
-		chunk.collision_queued = false # Unflag
-
-		# Only dispatch if it still requires rebuilding
-		if chunk.collision_dirty:
-			collision_controller.rebuild(chunk)
-			
-		processed_collisions += 1
-			
-	if not initial_generation_cooked:
-		if job_queue.is_empty() and active_thread_tasks.is_empty() and dirty_queue.is_empty() and collision_queue.is_empty():
-			initial_generation_cooked = true
-		if isDev:
-			if isDev:
-				diagnostics.log_message("Voxel Engine: True Async generation empty. All background meshes live!")
-		generation_completed.emit()
-
-
-func process_chunk(chunk: Chunk) -> void:
-	# Safe short-circuit validation check
-	if not is_instance_valid(chunk) or chunk.is_queued_for_deletion():
-		return
-	dirty_queue_processed_this_frame += 1
-	# Run the meshing controller pass
-	if chunk.mesh_dirty:
-		mesh_controller.rebuild(chunk, snapshot)
-		chunk_mesh_finished.emit(chunk.chunk_coordinate)
-
-func _main_thread_instantiate_chunk(job: ChunkJob) -> void:
-	var coord = job.chunk_coordinate
-	
-	# DYNAMIC AUTHORIZATION DEPTH CHECK
-	var base_coord = coord
-	if job.lod_level > 0:
-		# Calculate the exact LOD 0 root coordinate column
-		var factor = int(pow(2, job.lod_level))
-		base_coord = Vector3i(
-			int(floor(float(coord.x) / factor)),
-			int(floor(float(coord.y) / factor)),
-			int(floor(float(coord.z) / factor))
-		)
-		
-	# FETCH CURRENT LIVE AUTHORIZATION LEVEL
-	var current_authorized_lod = authorized_lod_levels.get(base_coord, 0)
-	
-	# Base chunks (LOD 0) must ALWAYS instantiate to hold their children!
-	if job.lod_level > current_authorized_lod:
-		if isDev:
-			if job.lod_level > current_authorized_lod and isDev:
-				diagnostics.log_stale_thread(coord, job.lod_level, current_authorized_lod)
-		
-		var stale_key = get_chunk_key(coord, job.lod_level)
-		if chunks.has(stale_key):
-			var stale_chunk = chunks[stale_key]
-			if is_instance_valid(stale_chunk):
-				stale_chunk.queue_free()
-			chunks.erase(stale_key)
-		return
-
-	var key = get_chunk_key(coord, job.lod_level)
-	
-	# DUPLICATE GUARD
-	if chunks.has(key) and is_instance_valid(chunks[key]):
-		return
-
-	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
-	var chunk: Chunk = acquire_chunk() 
-	# TODO VOX-312
-	# Replace direct voxel access with VoxelDataController API.
-	chunk.manager = self
-	chunk.position = job.world_position
-	chunk.voxel_size = local_voxel_scale
-	chunk.lod_level = job.lod_level
-	chunk.current_lod = job.lod_level
-	chunk.chunk_coordinate = job.chunk_coordinate 
-	chunk.mat = chunk_material
-	chunk.chunk_size = chunk_size 
-
-	if job.lod_level > 0:
-		chunk.deactivate()
-
-	chunks[key] = chunk
-	# TODO VOX-312
-	# Replace direct voxel access with VoxelDataController API.
-	voxel_data_controller.set_voxel_data(chunk.voxel_data,job.data)
-	_link_subdivision_hierarchy(coord, chunk)
-
-
-
-func _async_worker_execute(job: ChunkJob) -> void:
-	if job.type == ChunkJob.JobType.GENERATE:
-		_bg_thread_generate_voxels(job)
-
-
-func _bg_thread_generate_voxels(job: ChunkJob) -> void:
-	var local_voxel_scale = voxel_scale / pow(2, job.lod_level)
-
-	var voxel_data = terrain_generator.generate_data(
-		job.world_position,
-		chunk_size,
-		local_voxel_scale,
-		dimensions.y,
-		random,
-		colors,
-	)
-	
-	job.data = voxel_data
-	_main_thread_instantiate_chunk.call_deferred(job)
-
-# ----------------------------
-# BASELINE INITIALIZATION
-# ----------------------------
-func start_world_generation() -> void:
-	
-	initial_generation_cooked = false
-	
-	authorized_lod_levels.clear()
-	
-	var total_chunks_x = int(ceil(dimensions.x / chunk_lod_size))
-	var total_chunks_y = int(ceil(dimensions.y / chunk_lod_size))
-	var total_chunks_z = int(ceil(dimensions.z / chunk_lod_size))
-	
-	var total_queued := 0
-
-	for x in range(total_chunks_x):
-		for z in range(total_chunks_z):
-			for y in range(total_chunks_y):
-				
-				var coord = Vector3i(x, y, z)
-				authorized_lod_levels[coord] = 0 # Initialize authorization maps
-				var world_pos = Vector3(coord) * chunk_lod_size
-				
-				var job = ChunkJob.new(
-					ChunkJob.JobType.GENERATE,
-					coord,
-					world_pos,
-					{},
-					1.0, 
-					0   
-				)
-				
-				job_queue.push(job)
-				total_queued += 1
-				
-	if isDev:
-		diagnostics.log_message("Voxel Engine: Initial map queued successfully! Total chunks: " + str(total_queued))
-
-
-# ----------------------------
-# HIERARCHY RESOLUTION
-# ----------------------------
-func _link_subdivision_hierarchy(
-	child_coord: Vector3i,
-	child_chunk: Chunk
-) -> void:
-
-	if child_chunk.lod_level == 0:
-		return
-
-	var parent_coord = Vector3i(
-		child_coord.x >> 1,
-		child_coord.y >> 1,
-		child_coord.z >> 1
-	)
-
-	var parent_key = get_chunk_key(
-		parent_coord,
-		child_chunk.lod_level - 1
-	)
-
-	if chunks.has(parent_key):
-		var parent_chunk: Chunk = chunks[parent_key]
-
-		child_chunk.parent_chunk = parent_chunk
-
-		if not parent_chunk.child_chunks.has(child_chunk):
-			parent_chunk.child_chunks.append(child_chunk)
-			
-
-
-func queue_dirty_chunk(chunk: Chunk) -> void:
-	if not is_instance_valid(chunk):
-		return
-
-	if chunk in dirty_queue:
-		return
-
-	dirty_queue.append(chunk)
-	
-func queue_collision_chunk(chunk: Chunk) -> void:
-	if not is_instance_valid(chunk):
-		return
-
-	if chunk.collision_dirty == false:
-		return
-
-	if chunk.collision_queued:
-		return
-
-	chunk.collision_queued = true
-	collision_queue.append(chunk)
-
-# ==================================================
-# OBJECT POOLING
-# ==================================================
-func acquire_chunk() -> Chunk:
-	var chunk: Chunk
-	var pool := ChunkPool.new(chunk_scene)
-	if pool.is_empty():
-		chunk = chunk_scene.instantiate()
-		add_child(chunk) # Keep it in the scene tree permanently
-	else:
-		pool = inactive_chunks.pop_back()
-	
-	chunk.reset()
-	return chunk
-
-func release_chunk(chunk: Chunk) -> void:
-	if not is_instance_valid(chunk):
-		return
-	chunk.deactivate()
-	inactive_chunks.append(chunk)
-
-# ----------------------------
-# CHUNK WIREFRAMES (DEBUG ONLY)
-# ----------------------------
-#func _create_chunk_wireframe_bounds(chunk: Chunk) -> void:
-	#if is_instance_valid(chunk.visual_bounds_mesh):
-		#if chunk.visual_bounds_mesh.mesh:
-			#chunk.visual_bounds_mesh.material_override = null
-			#chunk.visual_bounds_mesh.mesh = null
-			#chunk.visual_bounds_mesh.free()
-#
-	#var world_size = float(chunk_size) * chunk.voxel_size
-#
-	#var min_p = Vector3.ZERO
-	#var max_p = Vector3.ONE * world_size
-#
-	#var line_vertices := PackedVector3Array()
-#
-	#var append_line = func(from: Vector3, to: Vector3):
-		#line_vertices.append(from)
-		#line_vertices.append(to)
-#
-	## Bottom face
-	#append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, min_p.z))
-	#append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, min_p.y, max_p.z))
-	#append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, max_p.z))
-	#append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, min_p.y, min_p.z))
-#
-	## Top face
-	#append_line.call(Vector3(min_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
-	#append_line.call(Vector3(max_p.x, max_p.y, min_p.z), Vector3(max_p.x, max_p.y, max_p.z))
-	#append_line.call(Vector3(max_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
-	#append_line.call(Vector3(min_p.x, max_p.y, max_p.z), Vector3(min_p.x, max_p.y, min_p.z))
-#
-	## Vertical pillars
-	#append_line.call(Vector3(min_p.x, min_p.y, min_p.z), Vector3(min_p.x, max_p.y, min_p.z))
-	#append_line.call(Vector3(max_p.x, min_p.y, min_p.z), Vector3(max_p.x, max_p.y, min_p.z))
-	#append_line.call(Vector3(max_p.x, min_p.y, max_p.z), Vector3(max_p.x, max_p.y, max_p.z))
-	#append_line.call(Vector3(min_p.x, min_p.y, max_p.z), Vector3(min_p.x, max_p.y, max_p.z))
-#
-	#var surface_array = []
-	#surface_array.resize(Mesh.ARRAY_MAX)
-	#surface_array[Mesh.ARRAY_VERTEX] = line_vertices
-#
-	#var imm_mesh = ArrayMesh.new()
-	#imm_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, surface_array)
-#
-	#var debug_mat = StandardMaterial3D.new()
-	#debug_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-#
-	#var colors = [Color.GREEN, Color.CYAN, Color.ORANGE, Color.MAGENTA]
-	#debug_mat.albedo_color = colors[chunk.lod_level % colors.size()]
-#
-	#var bounds_visualizer = MeshInstance3D.new()
-	#bounds_visualizer.mesh = imm_mesh
-	#bounds_visualizer.set_surface_override_material(0, debug_mat)
-#
-	#chunk.add_child(bounds_visualizer)
-	#chunk.visual_bounds_mesh = bounds_visualizer

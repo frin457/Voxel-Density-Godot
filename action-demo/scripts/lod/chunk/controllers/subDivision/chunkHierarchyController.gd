@@ -83,7 +83,7 @@ func remove_descendants(
 # ----------------------------
 # HIERARCHY RESOLUTION
 # ----------------------------
-func _link_to_parent(
+func attach_to_parent(
 	context: EngineContext,
 	child: Chunk
 ) -> void:
@@ -91,17 +91,14 @@ func _link_to_parent(
 	if child.lod_level == 0:
 		return
 
-	var parent_coord = Vector3i(
-		child.x >> 1,
-		child.y >> 1,
-		child.z >> 1
+	var parent_coord := Vector3i(
+		child.chunk_coordinate.x >> 1,
+		child.chunk_coordinate.y >> 1,
+		child.chunk_coordinate.z >> 1
 	)
 	
 	var parent_chunk: Chunk = context.registry.get_chunk(parent_coord,child.lod_level - 1)
 	if parent_chunk == null:
 		return
 
-	child.parent_chunk = parent_chunk
-
-	if not parent_chunk.child_chunks.has(child):
-		parent_chunk.child_chunks.append(child)
+	attach_child(parent_chunk,child)
