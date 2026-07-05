@@ -20,7 +20,9 @@ var terrain_generator : TerrainGenerator
 var dirty_processor : DirtyChunkProcessor
 var collision_processor : CollisionProcessor
 var mesh_controller : ChunkMeshController
-var collision_controller : CollisionController
+var collision_controller : CollisionSnapshotFactory
+var mesh_snapshot_factory : MeshSnapshotFactory
+var collision_snapshot_controller : CollisionSnapshotController
 
 var subdivision_planner : SubdivisionPlanner
 var merge_planner : MergePlanner

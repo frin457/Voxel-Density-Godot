@@ -1,4 +1,4 @@
-class_name MeshSnapshotController extends RefCounted
+class_name MeshSnapshotFactory extends RefCounted
 
 func create_snapshot(
 	voxel_data: VoxelChunkData,

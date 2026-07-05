@@ -1,19 +1,19 @@
 #./scripts/lod/tests/controllers/voxelDataTest.gd
 class_name CollisionControllerTest extends BaseTest
 
-var controller: CollisionController
+var controller: CollisionSnapshotFactory
 var snapshot: CollisionSnapshot
 var chunk : Chunk
 
 var voxel_data := {}
 
 func get_name() -> String:
-	return "CollisionController Contract"
+	return "CollisionSnapshotFactory Contract"
 
 
 func setup() -> void:
 
-	controller = CollisionController.new()
+	controller = CollisionSnapshotFactory.new()
 	snapshot = CollisionSnapshot.new()
 
 

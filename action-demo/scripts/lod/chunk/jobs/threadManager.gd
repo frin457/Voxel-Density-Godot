@@ -26,12 +26,12 @@ func _dispatch_jobs() -> void:
 			break
 
 		var task := WorkerThreadPool.add_task(
-			context.worker_execute.bind(job),
+			_worker_execute.bind(job),
 			true,
-			"Voxel_%s" % context.registry.get_key(
+			"Voxel_%s_%s" % [
 				job.chunk_coordinate,
 				job.lod_level
-			)
+			]
 		)
 
 		context.active_thread_tasks.append(task)
@@ -59,11 +59,10 @@ func _generate_chunk(job: ChunkJob) -> void:
 		/ pow(2.0, job.lod_level)
 	)
 	grid.max_world_height = context.dimensions.y
-
 	job.data = context.terrain_generator.generate(
 		grid,
 		context.noise,
 		context.colors
 	)
-
+	
 	context.chunk_instantiator.instantiate.call_deferred(job)

@@ -2,26 +2,21 @@
 class_name WorldGenerationController extends RefCounted
 
 var context: EngineContext
-var planner := WorldPlanner
+var planner := WorldPlanner.new()
 
 
 func _init(_context: EngineContext) -> void:
 	context = _context
-	planner = WorldPlanner.new(context)
 
 func start_world_generation() -> void:
-
-	context.initial_generation_cooked = false
 	context.authorized_lod_levels.clear()
-
 	var total_queued := 0
-
-	var plan := planner.create_plan(
+	var plans = planner.create_plan(
 		context.dimensions,
 		context.chunk_lod_size
 	)
-
-	for job in plan.jobs:
+	
+	for job in plans.jobs:
 
 		context.authorized_lod_levels[job.chunk_coordinate] = 0
 

@@ -1,147 +1,27 @@
-#./scripts/lod/chunk/controllers/voxelDataController.gd
+# ./scripts/lod/chunk/controllers/voxelDataController.gd
 class_name VoxelDataController extends RefCounted
-
 # ==================================================
 # PUBLIC API
 # ==================================================
-
 func set_voxel_data(
-	voxel_data: VoxelChunkData,
-	source: Dictionary
+	target: VoxelChunkData,
+	source: VoxelChunkData
 ) -> void:
 
-	voxel_data.voxel_ids = source["ids"].duplicate()
-	voxel_data.voxel_density = source["density"].duplicate()
-	voxel_data.voxel_colors = source["colors"].duplicate()
-
-	voxel_data.original_voxel_ids = voxel_data.voxel_ids.duplicate()
-	voxel_data.original_voxel_density = voxel_data.voxel_density.duplicate()
-	voxel_data.original_voxel_colors = voxel_data.voxel_colors.duplicate()
-
-func destroy_voxel(
-	voxel_data: VoxelChunkData,
-	index: int
-) -> void:
-
-	if not is_instance_valid(voxel_data):
-		return
-	if voxel_data.voxel_ids.get(index) == 0:
+	if target == null or source == null:
 		return
 
-	voxel_data.voxel_ids[index] = 0
-	voxel_data.voxel_density[index] = 0
-	voxel_data.voxel_colors[index] = 0
+	target.voxel_ids = source.voxel_ids.duplicate()
+	target.voxel_density = source.voxel_density.duplicate()
+	target.voxel_colors = source.voxel_colors.duplicate()
 
-	#update_surface_cache(voxel_data)
+	target.original_voxel_ids = source.voxel_ids.duplicate()
+	target.original_voxel_density = source.voxel_density.duplicate()
+	target.original_voxel_colors = source.voxel_colors.duplicate()
 
+	target.is_empty_air = source.is_empty_air
 
-func restore_voxel(
-	voxel_data: VoxelChunkData,
-	index: int
-) -> void:
+	target.sub_quadrant_has_surfaces.clear()
 
-	if not is_instance_valid(voxel_data):
-		return
-	if voxel_data.original_voxel_ids[index] == 0:
-		return
-	if voxel_data.voxel_ids[index] != 0:
-		return
-
-	voxel_data.voxel_ids[index] = voxel_data.original_voxel_ids[index]
-	voxel_data.voxel_density[index] = voxel_data.original_voxel_density[index]
-	voxel_data.voxel_colors[index] = voxel_data.original_voxel_colors[index]
-
-
-func clear_voxel_data(voxel_data: VoxelChunkData) -> void:
-	if not is_instance_valid(voxel_data):
-		return
-
-	voxel_data.voxel_ids.clear()
-	voxel_data.voxel_density.clear()
-	voxel_data.voxel_colors.clear()
-
-	voxel_data.original_voxel_ids.clear()
-	voxel_data.original_voxel_density.clear()
-	voxel_data.original_voxel_colors.clear()
-
-	voxel_data.is_empty_air = true
-
-	for key in voxel_data.sub_quadrant_has_surfaces:
-		voxel_data.sub_quadrant_has_surfaces[key] = false
-
-#
-## ==================================================
-## SURFACE CACHE
-## ==================================================
-#
-#func update_surface_cache(voxel_data: VoxelChunkData) -> void:
-#
-	#if not is_instance_valid(chunk):
-		#return
-#
-	#chunk.is_empty_air = true
-#
-	#var q_keys := [
-		#Vector3i(0,0,0),
-		#Vector3i(1,0,0),
-		#Vector3i(0,1,0),
-		#Vector3i(1,1,0),
-		#Vector3i(0,0,1),
-		#Vector3i(1,0,1),
-		#Vector3i(0,1,1),
-		#Vector3i(1,1,1)
-	#]
-#
-	#var q_found := [
-		#false,false,false,false,
-		#false,false,false,false
-	#]
-#
-	#var quadrants_completed := 0
-## TODO VOX-312
-	# Replace direct voxel access with VoxelDataController API.
-	#var half_size := int(chunk.chunk_size / 2)
-	#var size := chunk.chunk_size
-	#var size_sq := chunk.chunk_size_sq
-#
-	#for z in range(size):
-#
-		#var z_offset = z * size_sq
-		#var q_z = 4 if z >= half_size else 0
-#
-		#for y in range(size):
-#
-			#var y_offset = y * size
-			#var q_y = 2 if y >= half_size else 0
-#
-			#for x in range(size):
-#
-				#var index = x + y_offset + z_offset
-## TODO VOX-312
-	# Replace direct voxel access with VoxelDataController API.
-				#if chunk.voxel_ids[index] == 0:
-					#continue
-## TODO VOX-312
-	# Replace direct voxel access with VoxelDataController API.
-				#chunk.is_empty_air = false
-#
-				#var q_x = 1 if x >= half_size else 0
-				#var flat_index = q_x + q_y + q_z
-#
-				#if not q_found[flat_index]:
-					#q_found[flat_index] = true
-					#quadrants_completed += 1
-#
-				#if quadrants_completed == 8:
-					#break
-#
-			#if quadrants_completed == 8:
-				#break
-#
-		#if quadrants_completed == 8:
-			#break
-#
-	#for i in range(8):
-	# TODO VOX-312
-	# Replace direct voxel access with VoxelDataController API.
-		#chunk.sub_quadrant_has_surfaces[q_keys[i]] = q_found[i]
+	for key in source.sub_quadrant_has_surfaces:
+		target.sub_quadrant_has_surfaces[key] = source.sub_quadrant_has_surfaces[key]

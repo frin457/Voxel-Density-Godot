@@ -17,14 +17,12 @@ func _init(
 
 
 func acquire() -> Chunk:
+	var chunk : Chunk 
 	if inactive_chunks.is_empty():
-		var chunk: Chunk = scene.instantiate()
+		chunk = scene.instantiate()
 		scene_root.add_child(chunk)
 		chunk.reset()
-		return chunk
-
-	var chunk : Chunk = inactive_chunks.pop_back()
-	chunk.reset()
+	else: chunk = inactive_chunks.pop_back()
 	return chunk
 
 

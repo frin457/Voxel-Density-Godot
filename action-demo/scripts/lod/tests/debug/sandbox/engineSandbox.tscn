@@ -11,7 +11,7 @@ vertex_color_use_as_albedo = true
 [sub_resource type="Environment" id="Environment_i7ld0"]
 background_mode = 2
 
-[node name="EngineSandbox" type="Node2D" unique_id=1309928331]
+[node name="EngineSandbox" type="Node3D" unique_id=145110199]
 script = ExtResource("1_i7ld0")
 
 [node name="ChunkManager" type="Node" parent="." unique_id=1184542629]
@@ -30,7 +30,7 @@ shadow_enabled = true
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=18190319]
 
-[node name="DebugVisualizer" type="Node" parent="." unique_id=971144324]
+[node name="DebugVisualizer" type="Node3D" parent="." unique_id=1232622652]
 script = ExtResource("3_7j3km")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=353852018]

@@ -38,12 +38,12 @@ var scene_root : Node
 # ==================================================
 
 var context: EngineContext
-
 # ==================================================
 # CONTROLLERS
 # ==================================================
 
 var terrain_generator := TerrainGenerator.new()
+var terrain_noise := FastNoiseLite.new()
 var voxel_data_controller := VoxelDataController.new()
 
 var registry := ChunkRegistry.new()
@@ -77,60 +77,9 @@ signal generation_requested()
 # ==================================================
 
 func _ready() -> void:
-	
 	chunk_lod_size = float(chunk_size) * voxel_scale
-
 	_sanitize_world_settings()
-
-	context = EngineContext.new()
-	context.scene_root = self
-	#context.chunk_scene = chunk_scene
-
-	context.pool = ChunkPool.new(
-		context.chunk_scene,
-		context.scene_root
-	)
-
-	context.manager = self
-	context.scene_root = self
-
-	context.is_dev = isDev
-
-	context.dimensions = dimensions
-
-	context.chunk_size = chunk_size
-	context.chunk_lod_size = chunk_lod_size
-	context.voxel_scale = voxel_scale
-
-	context.chunk_material = chunk_material
-	context.colors = colors
-
-	context.worker_count = workerCount
-
-	context.registry = registry
-
-	context.terrain_generator = terrain_generator
-	context.voxel_data_controller = voxel_data_controller
-
-	hierarchy = ChunkHierarchyController.new()
-	context.hierarchy = hierarchy
-
-	diagnostics = DiagnosticsController.new(context)
-	context.diagnostics = diagnostics
-
-	thread_manager = ThreadManager.new(context)
-
-	queue_controller = QueueController.new(context)
-
-	dirty_processor = DirtyChunkProcessor.new(context)
-
-	collision_processor = CollisionProcessor.new(context)
-
-	chunk_instantiator = ChunkInstantiationController.new(context)
-
-	subdivision_controller = SubdivisionController.new(context)
-
-	world_generation_controller = WorldGenerationController.new(context)
+	_initialize_context()
 
 	subdivision_requested.connect(
 		subdivision_controller.request_subdivision
@@ -230,3 +179,64 @@ func _sanitize_world_settings() -> void:
 		max(1.0, dimensions.y),
 		max(1.0, dimensions.z)
 	)
+
+func _initialize_context() -> void:
+	context = EngineContext.new()
+	context.scene_root = self
+	var chunk_scene := preload("res://scripts/lod/chunk/chunk.tscn")
+	context.chunk_scene = chunk_scene
+	
+	context.pool = ChunkPool.new(
+		context.chunk_scene,
+		self
+	)
+	context.manager = self
+
+	context.is_dev = isDev
+	context.noise = terrain_noise
+
+	context.dimensions = dimensions
+
+	context.chunk_size = chunk_size
+	context.chunk_lod_size = chunk_lod_size
+	context.voxel_scale = voxel_scale
+
+	context.chunk_material = chunk_material
+	context.colors = colors
+
+	context.worker_count = workerCount
+
+	context.registry = registry
+
+	context.terrain_generator = terrain_generator
+	context.voxel_data_controller = voxel_data_controller
+	
+	context.mesh_snapshot_factory = MeshSnapshotFactory.new()
+	context.collision_snapshot_controller = CollisionSnapshotController.new()
+	
+	context.job_queue = ChunkJobQueue.new()
+	context.active_thread_tasks = []
+	context.dirty_queue = []
+	context.collision_queue = []
+	
+	hierarchy = ChunkHierarchyController.new()
+	context.hierarchy = hierarchy
+
+	diagnostics = DiagnosticsController.new(context)
+	context.diagnostics = diagnostics
+	thread_manager = ThreadManager.new(context)
+
+	queue_controller = QueueController.new(context)
+
+	dirty_processor = DirtyChunkProcessor.new(context)
+
+	collision_processor = CollisionProcessor.new(context)
+
+	chunk_instantiator = ChunkInstantiationController.new(context)
+	context.chunk_instantiator = chunk_instantiator
+
+	subdivision_controller = SubdivisionController.new(context)
+	context.subdivision_planner = SubdivisionPlanner.new()
+	context.merge_planner = MergePlanner.new()
+	
+	world_generation_controller = WorldGenerationController.new(context)

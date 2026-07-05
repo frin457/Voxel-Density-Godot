@@ -1,5 +1,5 @@
-#./scripts/lod/chunk/controllers/collisionController.gd
-class_name CollisionController extends RefCounted
+#./scripts/lod/chunk/controllers/CollisionSnapshotFactory.gd
+class_name CollisionSnapshotFactory extends RefCounted
 
 var cooking_chunks : Dictionary = {}
 var stale_chunks : Dictionary = {}

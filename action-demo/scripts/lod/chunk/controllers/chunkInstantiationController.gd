@@ -23,7 +23,7 @@ func instantiate(job: ChunkJob) -> void:
 		job.data
 	)
 
-	context.hierarchy.attach_to_parent(chunk)
+	context.hierarchy.attach_to_parent(context,chunk)
 
 
 func _validate_job(job: ChunkJob) -> bool:
@@ -83,7 +83,7 @@ func _initialize_chunk(
 	chunk.lod_level = job.lod_level
 	chunk.current_lod = job.lod_level
 
-	chunk.mat = context.chunk_material
+	#chunk = context.chunk_material
 
 
 func _initialize_chunk_state(chunk: Chunk) -> void:

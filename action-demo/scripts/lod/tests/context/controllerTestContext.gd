@@ -22,11 +22,11 @@ var collision_snapshot := CollisionSnapshot.new()
 # ==================================================
 
 var voxel_data_controller := VoxelDataController.new()
-var mesh_snapshot_controller := MeshSnapshotController.new()
+var mesh_snapshot_controller := MeshSnapshotFactory.new()
 var collision_snapshot_controller := CollisionSnapshotController.new()
 
 var mesh_controller := ChunkMeshController.new()
-var collision_controller := CollisionController.new()
+var collision_controller := CollisionSnapshotFactory.new()
 
 # ==================================================
 # SCENE OBJECTS

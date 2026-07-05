@@ -35,7 +35,7 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 					ChunkJob.JobType.GENERATE,
 					child_coord,
 					child_world_pos,
-					{},
+					null,
 					1.0,
 					target_level
 				)

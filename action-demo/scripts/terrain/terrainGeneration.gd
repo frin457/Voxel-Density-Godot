@@ -32,7 +32,6 @@ func generate(
 		for z in range(grid.chunk_size):
 
 			var world_z = grid.world_position.z + float(z) * grid.voxel_size
-
 			var noise_value := (
 				noise.get_noise_2d(world_x, world_z)
 				+ 0.5 * noise.get_noise_2d(world_x * 2.0, world_z * 2.0)

@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Action-Demo"
-run/main_scene="uid://dox5ldec78cee"
+run/main_scene="uid://whkb060m4ool"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 

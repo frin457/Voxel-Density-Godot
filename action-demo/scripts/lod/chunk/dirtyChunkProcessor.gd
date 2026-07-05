@@ -21,11 +21,13 @@ func process(chunk: Chunk) -> void:
 	if not chunk.mesh_dirty:
 		return
 
+	var snapshot := context.mesh_snapshot_factory.create_snapshot(
+	chunk.voxel_data,
+	chunk.grid_info
+)
+
 	context.mesh_controller.rebuild(
 		chunk,
-		context.snapshot
+		snapshot
 	)
-
-	context.chunk_mesh_finished.emit(
-		chunk.chunk_coordinate
-	)
+	context.chunk_mesh_finished.emit(chunk.chunk_coordinate)
