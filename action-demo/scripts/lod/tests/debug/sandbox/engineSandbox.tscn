@@ -16,10 +16,12 @@ script = ExtResource("1_i7ld0")
 
 [node name="ChunkManager" type="Node" parent="." unique_id=1184542629]
 script = ExtResource("2_7j3km")
-dimensions = Vector3(64, 64, 64)
+dimensions = Vector3(1, 1, 1)
+chunk_size = 1
 chunk_material = SubResource("StandardMaterial3D_i7ld0")
 
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("4_6ac5w")]
+transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, -60, -12, -140)
 
 [node name="Camera3D" type="Camera3D" parent="Player" unique_id=33363768]
 transform = Transform3D(10, 0, 0, 0, 8.660254, 5, 0, -5, 8.660254, 640, 160, 1500)
