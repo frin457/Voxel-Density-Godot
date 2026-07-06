@@ -197,7 +197,7 @@ func log_collision_processing(chunk: Chunk) -> void:
 
 func log_mesh_snapshot(
 	chunk: Chunk,
-	snapshot: MeshSnapshot
+	snap: MeshSnapshot
 ) -> void:
 
 	if !context.is_dev:
@@ -205,7 +205,7 @@ func log_mesh_snapshot(
 
 	var solid := 0
 
-	for id in snapshot.voxel_ids:
+	for id in snap.voxel_ids:
 		if id != 0:
 			solid += 1
 
@@ -215,7 +215,7 @@ func log_mesh_snapshot(
 		" Solid Voxels=",
 		solid,
 		"/",
-		snapshot.voxel_ids.size()
+		snap.voxel_ids.size()
 	)
 
 
