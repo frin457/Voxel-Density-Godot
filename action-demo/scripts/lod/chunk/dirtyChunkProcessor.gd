@@ -1,5 +1,4 @@
-class_name DirtyChunkProcessor
-extends RefCounted
+class_name DirtyChunkProcessor extends RefCounted
 
 var context: EngineContext
 
@@ -9,7 +8,6 @@ func _init(_context: EngineContext) -> void:
 
 
 func process(chunk: Chunk) -> void:
-
 	if not is_instance_valid(chunk):
 		return
 
@@ -25,9 +23,14 @@ func process(chunk: Chunk) -> void:
 	chunk.voxel_data,
 	chunk.grid_info
 )
-
+	context.diagnostics.log_mesh_snapshot(
+		chunk,
+		snapshot
+	)
 	context.mesh_controller.rebuild(
 		chunk,
 		snapshot
 	)
-	context.chunk_mesh_finished.emit(chunk.chunk_coordinate)
+	context.dirty_queue.pop_front()
+
+	chunk.mesh_queued = false

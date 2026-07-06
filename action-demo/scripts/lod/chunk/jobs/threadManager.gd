@@ -55,7 +55,7 @@ func _generate_chunk(job: ChunkJob) -> void:
 	grid.world_position = job.world_position
 	grid.chunk_size = context.chunk_size
 	grid.voxel_size = (
-		context.voxel_scale
+		context.voxel_size
 		/ pow(2.0, job.lod_level)
 	)
 	grid.max_world_height = context.dimensions.y
@@ -64,5 +64,4 @@ func _generate_chunk(job: ChunkJob) -> void:
 		context.noise,
 		context.colors
 	)
-	
 	context.chunk_instantiator.instantiate.call_deferred(job)

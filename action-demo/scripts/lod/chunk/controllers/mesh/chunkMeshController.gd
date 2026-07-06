@@ -13,7 +13,6 @@ func rebuild(
 	snapshot: MeshSnapshot,
 	#material: Material
 ) -> void:
-
 	if not is_instance_valid(chunk):
 		return
 
@@ -26,7 +25,7 @@ func rebuild(
 	WorkerThreadPool.add_task(
 		_generate_mesh.bind(chunk, snapshot),
 		true,
-		"Mesh_%s" % chunk.chunk_coordinate
+		"Mesh_%s" % chunk.grid_info.chunk_coordinate
 	)
 
 
@@ -34,7 +33,6 @@ func _generate_mesh(
 	chunk: Chunk,
 	snapshot: MeshSnapshot
 ) -> void:
-
 	var arrays = active_mesher.generate_mesh_data(snapshot)
 
 	if not is_instance_valid(chunk):
@@ -62,7 +60,6 @@ func apply_mesh(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
 		pending_surfaces.erase(chunk) # Prevent memory leaks if chunk was destroyed
 		return
-
 	var surface_arrays = pending_surfaces.get(chunk, [])
 
 	if surface_arrays.size() > 0 and surface_arrays[Mesh.ARRAY_VERTEX] != null:
@@ -80,8 +77,7 @@ func apply_mesh(chunk: Chunk) -> void:
 	
 	# Cleanup memory
 	pending_surfaces.erase(chunk)
-
-	if chunk.manager:
-		chunk.manager.queue_collision_chunk(chunk)
-		if chunk.manager.has_method("_create_chunk_wireframe_bounds"):
-			chunk.manager._create_chunk_wireframe_bounds(chunk)
+	
+	chunk.manager.queue_collision_chunk(chunk)
+	if chunk.manager.has_method("_create_chunk_wireframe_bounds"):
+		chunk.manager._create_chunk_wireframe_bounds(chunk)

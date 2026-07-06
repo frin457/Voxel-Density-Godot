@@ -45,9 +45,8 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 
 	var chunk_size = data.chunk_size
 	var chunk_size_sq = chunk_size * chunk_size
-	var voxel_scale = data.voxel_scale
+	var voxel_size = data.voxel_size
 	var voxel_origin := Vector3.ZERO
-	
 	for z in range(chunk_size):
 		for y in range(chunk_size):
 			for x in range(chunk_size):
@@ -57,11 +56,9 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 				if data.voxel_ids[voxel_index] == 0:
 					continue
 
-				voxel_origin = Vector3(x, y, z) * voxel_scale
+				voxel_origin = Vector3(x, y, z) * voxel_size
 				var voxel_color = data.voxel_colors[voxel_index]
-
 				for face_dir in NEIGHBOR_OFFSETS:
-
 					var offset = NEIGHBOR_OFFSETS[face_dir]
 
 					var nx = x + offset.x
@@ -98,7 +95,7 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 
 						var vertex_pos = (
 							voxel_origin +
-							(VERTICES[local_vertex_index] * voxel_scale)
+							(VERTICES[local_vertex_index] * voxel_size)
 						)
 
 						vertices.append(vertex_pos)
@@ -121,5 +118,4 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 		surface_arrays[Mesh.ARRAY_INDEX] = indices
 		surface_arrays[Mesh.ARRAY_NORMAL] = normals
 		surface_arrays[Mesh.ARRAY_COLOR] = colors
-
 	return surface_arrays

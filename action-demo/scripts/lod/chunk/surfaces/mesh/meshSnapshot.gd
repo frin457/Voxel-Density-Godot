@@ -5,7 +5,7 @@ var voxel_ids: PackedByteArray
 var voxel_colors: PackedColorArray
 var chunk_size: int
 var chunk_size_sq: int
-var voxel_scale: float
+var voxel_size: float
 
 ## Calculates the flat array index for a 3D coordinate.
 ## WARNING: This method carries GDScript function overhead. 

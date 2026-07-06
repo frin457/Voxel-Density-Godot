@@ -1,64 +1,89 @@
-#./scripts/lod/engine/engineContext.gd
-class_name EngineContext extends RefCounted
+class_name EngineContext
+extends RefCounted
+
 var is_dev := false
-#==================================================
+
+# ==================================================
 # ENGINE STATE
-#==================================================
-var manager : ChunkManager
-var scene_root : Node
+# ==================================================
 
-#==================================================
+var manager: ChunkManager
+var scene_root: Node
+
+var world_generation_controller: WorldGenerationController
+
+# ==================================================
 # ENGINE SERVICES
-#==================================================
-var registry : ChunkRegistry
-var pool : ChunkPool
-var chunk_instantiator : ChunkInstantiationController
+# ==================================================
 
-var voxel_data_controller : VoxelDataController
-var terrain_generator : TerrainGenerator
+var registry: ChunkRegistry
+var pool: ChunkPool
+var chunk_instantiator: ChunkInstantiationController
 
-var dirty_processor : DirtyChunkProcessor
-var collision_processor : CollisionProcessor
-var mesh_controller : ChunkMeshController
-var collision_controller : CollisionSnapshotFactory
-var mesh_snapshot_factory : MeshSnapshotFactory
-var collision_snapshot_controller : CollisionSnapshotController
+var voxel_data_controller: VoxelDataController
+var terrain_generator: TerrainGenerator
 
-var subdivision_planner : SubdivisionPlanner
-var merge_planner : MergePlanner
-var hierarchy : ChunkHierarchyController
-var activation : ActivationController
+var dirty_processor: DirtyChunkProcessor
+var collision_processor: CollisionProcessor
 
-var diagnostics : DiagnosticsController
+var mesh_controller: ChunkMeshController
+var collision_controller: CollisionController
 
-#==================================================
+var mesh_snapshot_factory: MeshSnapshotFactory
+var collision_snapshot_controller: CollisionSnapshotController
+
+var subdivision_planner: SubdivisionPlanner
+var merge_planner: MergePlanner
+
+var hierarchy: ChunkHierarchyController
+var activation: ActivationController
+
+var diagnostics: DiagnosticsController
+
+# ==================================================
 # WORK QUEUES
-#==================================================
+# ==================================================
+
+var queue_controller: QueueController
 
 var job_queue := ChunkJobQueue.new()
-var active_thread_tasks : Array[int] = []
-var dirty_queue : Array[Chunk] = []
-var collision_queue : Array[Chunk] = []
 
-#==================================================
-# CONFIGURATION
-#==================================================
-var chunk_scene : PackedScene
+var active_thread_tasks: Array[int] = []
 
-var chunk_size : int
-var voxel_size : float
-var chunk_world_size : float
-var max_world_height : float
-var colors : Array[Color]
-var noise : Noise
+var dirty_queue: Array[Chunk] = []
+var collision_queue: Array[Chunk] = []
 
-var dimensions : Vector3
-var voxel_scale : float
-var chunk_material : Material
-var worker_count : int
+var dirty_queue_processed_this_frame := 0
 
-#==================================================
+var max_dirty_queue_per_frame := 8
+var max_collisions_per_frame := 2
+
+# ==================================================
+# WORLD CONFIGURATION
+# ==================================================
+
+var chunk_scene: PackedScene
+
+# Default values copied into each chunk's GridInfo
+var chunk_size: int
+var voxel_size: float
+var max_world_height: float
+
+var chunk_lod_size: float
+
+var dimensions: Vector3
+
+var chunk_material: Material
+var colors: Array[Color]
+
+var noise: Noise
+
+var worker_count: int
+
+# ==================================================
 # THREAD STATE
-#==================================================
-var authorized_lod_levels : Dictionary = {}
-var chunk_lod_size : float
+# ==================================================
+
+var thread_manager: ThreadManager
+
+var authorized_lod_levels: Dictionary = {}

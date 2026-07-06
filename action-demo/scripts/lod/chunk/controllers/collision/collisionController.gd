@@ -1,5 +1,5 @@
-#./scripts/lod/chunk/controllers/CollisionSnapshotFactory.gd
-class_name CollisionSnapshotFactory extends RefCounted
+#./scripts/lod/chunk/controllers/CollisionController.gd
+class_name CollisionController extends RefCounted
 
 var cooking_chunks : Dictionary = {}
 var stale_chunks : Dictionary = {}
@@ -28,7 +28,7 @@ func rebuild(
 	WorkerThreadPool.add_task(
 		_cook_collision.bind(chunk, snapshot),
 		true,
-		"Collision_%s" % chunk.chunk_coordinate
+		"Collision_%s" % chunk.grid_info.chunk_coordinate
 	)
 
 

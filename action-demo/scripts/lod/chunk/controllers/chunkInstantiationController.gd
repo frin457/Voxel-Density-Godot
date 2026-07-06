@@ -9,7 +9,6 @@ func _init(_context: EngineContext) -> void:
 
 
 func instantiate(job: ChunkJob) -> void:
-
 	if not _validate_job(job):
 		return
 
@@ -24,7 +23,12 @@ func instantiate(job: ChunkJob) -> void:
 	)
 
 	context.hierarchy.attach_to_parent(context,chunk)
-
+	chunk.activate()
+	chunk.mark_dirty()
+	
+	context.diagnostics.log_message(
+	"[Instantiate] " + str(chunk.grid_info.chunk_coordinate)
+)
 
 func _validate_job(job: ChunkJob) -> bool:
 	var base_coord := job.chunk_coordinate
@@ -71,21 +75,37 @@ func _initialize_chunk(
 
 	chunk.position = job.world_position
 
-	chunk.voxel_size = (
-		context.voxel_scale
+	chunk.grid_info.voxel_size = (
+		context.voxel_size
 		/ pow(2.0, job.lod_level)
 	)
 
-	chunk.chunk_coordinate = job.chunk_coordinate
-
-	chunk.chunk_size = context.chunk_size
+	chunk.grid_info.chunk_coordinate = job.chunk_coordinate
+	chunk.grid_info.chunk_size = context.chunk_size
 
 	chunk.lod_level = job.lod_level
 	chunk.current_lod = job.lod_level
 
-	#chunk = context.chunk_material
+	#
+	# Initialize the shared grid description
+	#
 
+	chunk.grid_info.chunk_coordinate = job.chunk_coordinate
+	chunk.grid_info.world_position = job.world_position
+
+	chunk.grid_info.chunk_size = context.chunk_size
+	chunk.grid_info.chunk_size_sq = (
+		context.chunk_size * context.chunk_size
+	)
+
+	chunk.grid_info.voxel_size = context.voxel_size
+	chunk.grid_info.max_world_height = context.dimensions.y
+
+	#
+	# Material
+	#
+
+	chunk.mat = context.chunk_material
 
 func _initialize_chunk_state(chunk: Chunk) -> void:
-	if chunk.lod_level > 0:
-		chunk.deactivate()
+	chunk.deactivate()

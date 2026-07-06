@@ -11,6 +11,6 @@ func create_snapshot(
 
 	snapshot.chunk_size = grid.chunk_size
 	snapshot.chunk_size_sq = grid.chunk_size_sq
-	snapshot.voxel_scale = grid.voxel_scale
+	snapshot.voxel_size = grid.voxel_size
 
 	return snapshot

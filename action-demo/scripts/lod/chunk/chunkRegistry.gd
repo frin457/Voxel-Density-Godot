@@ -13,7 +13,7 @@ func register_chunk(chunk: Chunk) -> void:
 		return
 
 	_chunks[_get_key(
-		chunk.chunk_coordinate,
+		chunk.grid_info.chunk_coordinate,
 		chunk.lod_level
 	)] = chunk
 

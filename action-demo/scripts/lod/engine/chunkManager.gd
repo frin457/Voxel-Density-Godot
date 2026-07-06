@@ -12,7 +12,7 @@ extends Node
 
 @export var dimensions := Vector3(128, 64, 128)
 
-@export var voxel_scale := 1.0
+@export var voxel_size := 1.0
 @export var chunk_size := 16
 @export var chunk_material: Material
 
@@ -70,14 +70,14 @@ signal merge_requested(coord: Vector3i)
 
 signal generation_requested()
 #signal generation_completed()
-#signal chunk_mesh_finished(coord: Vector3i)
+
 
 # ==================================================
 # LIFECYCLE
 # ==================================================
 
 func _ready() -> void:
-	chunk_lod_size = float(chunk_size) * voxel_scale
+	chunk_lod_size = float(chunk_size) * voxel_size
 	_sanitize_world_settings()
 	_initialize_context()
 
@@ -98,6 +98,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	thread_manager.process()
+	queue_controller.process()
 
 # ==================================================
 # PUBLIC API
@@ -181,62 +182,113 @@ func _sanitize_world_settings() -> void:
 	)
 
 func _initialize_context() -> void:
+
+	#--------------------------------------------------
+	# Context
+	#--------------------------------------------------
+
 	context = EngineContext.new()
-	context.scene_root = self
-	var chunk_scene := preload("res://scripts/lod/chunk/chunk.tscn")
-	context.chunk_scene = chunk_scene
-	
-	context.pool = ChunkPool.new(
-		context.chunk_scene,
-		self
-	)
+
 	context.manager = self
+	context.scene_root = self
+	context.chunk_scene = preload("res://scripts/lod/chunk/chunk.tscn")
+
+	#--------------------------------------------------
+	# Configuration
+	#--------------------------------------------------
 
 	context.is_dev = isDev
-	context.noise = terrain_noise
 
 	context.dimensions = dimensions
 
 	context.chunk_size = chunk_size
 	context.chunk_lod_size = chunk_lod_size
-	context.voxel_scale = voxel_scale
+	context.voxel_size = voxel_size
 
 	context.chunk_material = chunk_material
 	context.colors = colors
 
 	context.worker_count = workerCount
 
-	context.registry = registry
+	context.noise = terrain_noise
 
-	context.terrain_generator = terrain_generator
-	context.voxel_data_controller = voxel_data_controller
-	
-	context.mesh_snapshot_factory = MeshSnapshotFactory.new()
-	context.collision_snapshot_controller = CollisionSnapshotController.new()
-	
+	#--------------------------------------------------
+	# Core Services
+	#--------------------------------------------------
+
+	context.registry = ChunkRegistry.new()
+
+	context.pool = ChunkPool.new(
+		context.chunk_scene,
+		self
+	)
+
+	context.terrain_generator = TerrainGenerator.new()
+
+	context.voxel_data_controller = VoxelDataController.new()
+
 	context.job_queue = ChunkJobQueue.new()
+
+	context.mesh_snapshot_factory = MeshSnapshotFactory.new()
+
+	context.collision_snapshot_controller = CollisionSnapshotController.new()
+
 	context.active_thread_tasks = []
+
 	context.dirty_queue = []
+
 	context.collision_queue = []
-	
-	hierarchy = ChunkHierarchyController.new()
-	context.hierarchy = hierarchy
 
-	diagnostics = DiagnosticsController.new(context)
-	context.diagnostics = diagnostics
-	thread_manager = ThreadManager.new(context)
+	#--------------------------------------------------
+	# Engine Controllers
+	#--------------------------------------------------
 
-	queue_controller = QueueController.new(context)
+	context.mesh_controller = ChunkMeshController.new()
 
-	dirty_processor = DirtyChunkProcessor.new(context)
+	context.collision_controller = CollisionController.new()
 
-	collision_processor = CollisionProcessor.new(context)
+	context.hierarchy = ChunkHierarchyController.new()
 
-	chunk_instantiator = ChunkInstantiationController.new(context)
-	context.chunk_instantiator = chunk_instantiator
+	context.subdivision_planner = SubdivisionPlanner.new()
+
+	context.merge_planner = MergePlanner.new()
+
+	context.diagnostics = DiagnosticsController.new(context)
+
+	context.queue_controller = QueueController.new(context)
+
+	context.dirty_processor = DirtyChunkProcessor.new(context)
+
+	context.collision_processor = CollisionProcessor.new(context)
+
+	context.chunk_instantiator = ChunkInstantiationController.new(context)
+
+	context.thread_manager = ThreadManager.new(context)
+
+	context.world_generation_controller = WorldGenerationController.new(context)
+
+	#--------------------------------------------------
+	# Mirror references (optional)
+	#--------------------------------------------------
+
+	registry = context.registry
+
+	thread_manager = context.thread_manager
+
+	queue_controller = context.queue_controller
+
+	dirty_processor = context.dirty_processor
+
+	collision_processor = context.collision_processor
+
+	chunk_instantiator = context.chunk_instantiator
+
+	hierarchy = context.hierarchy
+
+	diagnostics = context.diagnostics
+
+	world_generation_controller = context.world_generation_controller
 
 	subdivision_controller = SubdivisionController.new(context)
-	context.subdivision_planner = SubdivisionPlanner.new()
-	context.merge_planner = MergePlanner.new()
-	
-	world_generation_controller = WorldGenerationController.new(context)
+
+	print("Context initialized.")

@@ -20,7 +20,7 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 
 	var voxel_ids = data.voxel_ids
 	var voxel_colors = data.voxel_colors
-	var voxel_scale = data.voxel_scale
+	var voxel_size = data.voxel_size
 	
 	var mask := PackedInt32Array()
 	mask.resize(chunk_size_sq)
@@ -155,10 +155,10 @@ func generate_mesh_data(data: MeshSnapshot) -> Array:
 						var start_v_idx = vertices.size()
 
 						# Quad corners scaled out to the world sizing mesh bounds
-						var v0 = local_pos * voxel_scale
-						var v1 = (local_pos + width_vec) * voxel_scale
-						var v2 = (local_pos + width_vec + height_vec) * voxel_scale
-						var v3 = (local_pos + height_vec) * voxel_scale
+						var v0 = local_pos * voxel_size
+						var v1 = (local_pos + width_vec) * voxel_size
+						var v2 = (local_pos + width_vec + height_vec) * voxel_size
+						var v3 = (local_pos + height_vec) * voxel_size
 
 						vertices.append(v0)
 						vertices.append(v1)

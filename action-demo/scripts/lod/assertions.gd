@@ -168,7 +168,7 @@ static func assert_mesh_controller_clean(controller: ChunkMeshController, chunk:
 
 
 ## Validates the CollisionController has dropped all async tracking for a chunk
-static func assert_collision_controller_clean(controller: CollisionSnapshotFactory, chunk: Chunk) -> bool:
+static func assert_colliision_factory_clean(controller: CollisionController, chunk: Chunk) -> bool:
 	if not is_instance_valid(controller) or not is_instance_valid(chunk):
 		push_error("VoxelAssertions: Invalid controller or chunk instance.")
 		return false

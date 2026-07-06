@@ -26,7 +26,7 @@ var mesh_snapshot_controller := MeshSnapshotFactory.new()
 var collision_snapshot_controller := CollisionSnapshotController.new()
 
 var mesh_controller := ChunkMeshController.new()
-var collision_controller := CollisionSnapshotFactory.new()
+var colliision_factory := CollisionController.new()
 
 # ==================================================
 # SCENE OBJECTS
