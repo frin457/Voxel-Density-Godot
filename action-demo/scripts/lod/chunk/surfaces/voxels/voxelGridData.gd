@@ -7,7 +7,7 @@ var world_position: Vector3
 
 # Grid dimensions
 var chunk_size: int
-var chunk_size_sq: int
+var chunk_size_sq:= chunk_size * chunk_size
 var voxel_size: float
 
 # Generation settings

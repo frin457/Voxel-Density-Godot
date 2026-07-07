@@ -3,7 +3,7 @@ extends CharacterBody3D
 
 signal chunk_changed(new_chunk_coords: Vector3i)
 
-@export var mouse_sensativity : float = 0.1
+@export var mouse_sensativity : float = 0.001
 @export var chunk_size: float = 32.0 # Adjust this to match your actual chunk size
 
 @onready var head: Node3D = $Head

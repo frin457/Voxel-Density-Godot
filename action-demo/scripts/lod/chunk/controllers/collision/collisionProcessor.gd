@@ -14,7 +14,7 @@ func process(chunk : Chunk) -> void:
 	chunk.collision_queued = false
 	if !chunk.collision_dirty:
 		return
-		
+	#collisionProcessor.process()
 	var snapshot := context.collision_snapshot_controller.create_snapshot(
 		chunk.meshInstance.mesh
 	)

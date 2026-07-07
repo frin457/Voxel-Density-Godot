@@ -15,13 +15,9 @@ func start_world_generation() -> void:
 		context.dimensions,
 		context.chunk_lod_size
 	)
-	
 	for job in plans.jobs:
-
 		context.authorized_lod_levels[job.chunk_coordinate] = 0
-
 		context.job_queue.push(job)
-
 		total_queued += 1
 
 	if context.is_dev:

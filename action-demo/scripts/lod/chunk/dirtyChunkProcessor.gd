@@ -15,10 +15,8 @@ func process(chunk: Chunk) -> void:
 		return
 
 	context.dirty_queue_processed_this_frame += 1
-
 	if not chunk.mesh_dirty:
 		return
-
 	var snapshot := context.mesh_snapshot_factory.create_snapshot(
 	chunk.voxel_data,
 	chunk.grid_info

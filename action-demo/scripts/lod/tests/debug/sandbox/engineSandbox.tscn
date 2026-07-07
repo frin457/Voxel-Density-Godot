@@ -1,7 +1,7 @@
-[gd_scene format=3 uid="uid://whkb060m4ool"]
+[gd_scene format=3 uid="uid://3q6i2jp22o6d"]
 
-[ext_resource type="Script" uid="uid://trr82ocrcmb5" path="res://scripts/lod/tests/debug/sandbox/engineSandbox.gd" id="1_i7ld0"]
-[ext_resource type="Script" uid="uid://crantc20sjpad" path="res://scripts/lod/engine/chunkManager.gd" id="2_7j3km"]
+[ext_resource type="Script" uid="uid://c8hr7vrqull40" path="res://scripts/lod/tests/debug/sandbox/engineSandbox.gd" id="1_i7ld0"]
+[ext_resource type="Script" uid="uid://bvcavytcq7ray" path="res://scripts/lod/engine/chunkManager.gd" id="2_7j3km"]
 [ext_resource type="PackedScene" uid="uid://co68l2ekwhii8" path="res://controller/unit/player.tscn" id="4_6ac5w"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i7ld0"]
@@ -16,18 +16,15 @@ script = ExtResource("1_i7ld0")
 
 [node name="ChunkManager" type="Node" parent="." unique_id=1184542629]
 script = ExtResource("2_7j3km")
-dimensions = Vector3(1, 1, 1)
-chunk_size = 1
+isDev = true
+workerCount = 16
+dimensions = Vector3(64, 8, 64)
 chunk_material = SubResource("StandardMaterial3D_i7ld0")
+colors = Array[Color]([Color(0.31354445, 0.8761756, 0.3984938, 1), Color(0, 0.50980395, 0, 1), Color(0.11372549, 0.23529412, 0.07450981, 1), Color(0.3764706, 0.17254902, 0.11764706, 1), Color(0.3131077, 0.3151989, 0.46158457, 1), Color(0.11372549, 0.11764706, 0.07450981, 1)])
 
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("4_6ac5w")]
-transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, -60, -12, -140)
-
-[node name="Camera3D" type="Camera3D" parent="Player" unique_id=33363768]
-transform = Transform3D(10, 0, 0, 0, 8.660254, 5, 0, -5, 8.660254, 640, 160, 1500)
-current = true
-fov = 70.0
-far = 5000.0
+input_capture_on_drag = true
+chunk_size = 1.0
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=103030739]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -55, 45, 0)

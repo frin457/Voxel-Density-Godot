@@ -43,7 +43,6 @@ func _generate_mesh(
 	_mesh_complete.call_deferred(chunk)
 
 
-# New internal callback to replace the one previously inside Chunk
 func _mesh_complete(chunk: Chunk) -> void:
 	cooking_chunks.erase(chunk)
 	
@@ -79,5 +78,3 @@ func apply_mesh(chunk: Chunk) -> void:
 	pending_surfaces.erase(chunk)
 	
 	chunk.manager.queue_collision_chunk(chunk)
-	if chunk.manager.has_method("_create_chunk_wireframe_bounds"):
-		chunk.manager._create_chunk_wireframe_bounds(chunk)

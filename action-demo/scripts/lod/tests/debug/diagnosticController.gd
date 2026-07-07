@@ -146,7 +146,7 @@ func log_dirty_queued(chunk: Chunk) -> void:
 
 	print(
 		"[Dirty Queue] + ",
-		chunk.chunk_coordinate,
+		chunk.grid_info.chunk_coordinate,
 		" Queue=",
 		context.dirty_queue.size()
 	)
@@ -159,7 +159,7 @@ func log_dirty_processing(chunk: Chunk) -> void:
 
 	print(
 		"[Dirty Process] ",
-		chunk.chunk_coordinate
+		chunk.grid_info.chunk_coordinate
 	)
 
 
@@ -211,7 +211,7 @@ func log_mesh_snapshot(
 
 	print(
 		"[Mesh Snapshot] ",
-		chunk.chunk_coordinate,
+		chunk.grid_info.chunk_coordinate,
 		" Solid Voxels=",
 		solid,
 		"/",
