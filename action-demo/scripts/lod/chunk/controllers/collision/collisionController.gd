@@ -25,6 +25,7 @@ func rebuild(
 		return
 
 	cooking_chunks[chunk] = true
+	#TODO: UPDATE to push COLLISION JOB into queue
 	WorkerThreadPool.add_task(
 		_cook_collision.bind(chunk, snapshot),
 		true,

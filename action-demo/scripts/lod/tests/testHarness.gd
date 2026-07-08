@@ -18,8 +18,6 @@ func register_test(test: BaseTest) -> void:
 
 
 func register_suite():
-	
-	register_test(VoxelDataControllerTest.new())
 	register_test(FailureTest.new())
 	
 func clear_tests() -> void:

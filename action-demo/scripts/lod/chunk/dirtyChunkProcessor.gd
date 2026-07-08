@@ -29,6 +29,4 @@ func process(chunk: Chunk) -> void:
 		chunk,
 		snapshot
 	)
-	context.dirty_queue.pop_front()
-
 	chunk.mesh_queued = false

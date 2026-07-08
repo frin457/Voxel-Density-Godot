@@ -12,8 +12,9 @@ func instantiate(job: ChunkJob) -> void:
 	if not _validate_job(job):
 		return
 	if context.registry.has_chunk(job.chunk_coordinate, job.lod_level):
-			return
+		return
 	var chunk := _create_chunk()
+	
 	_initialize_chunk(chunk, job)
 	_initialize_chunk_state(chunk)
 	context.registry.register_chunk(chunk)
@@ -24,6 +25,10 @@ func instantiate(job: ChunkJob) -> void:
 	)
 
 	context.hierarchy.attach_to_parent(context,chunk)
+	print(
+	"after parent",
+	chunk.global_position
+)
 	chunk.activate()
 	chunk.mark_dirty()
 
@@ -69,11 +74,15 @@ func _initialize_chunk(
 ) -> void:
 
 	chunk.manager = context.manager
-	#chunk.position = job.world_position
+	chunk.position = job.world_position
 	chunk.lod_level = job.lod_level
 	chunk.current_lod = job.lod_level
-
-	#
+	
+	print(
+		chunk.name,
+		" local=", chunk.position,
+		" global=", chunk.global_position
+	)
 	# Initialize the shared grid description
 	#
 	chunk.grid_info.voxel_size = (
@@ -81,9 +90,6 @@ func _initialize_chunk(
 		/ pow(2.0, job.lod_level)
 	)
 	chunk.grid_info.max_world_height = context.dimensions.y
-
-	chunk.grid_info.chunk_coordinate = job.chunk_coordinate
-	chunk.grid_info.chunk_size = context.chunk_size
 
 	chunk.grid_info.chunk_coordinate = job.chunk_coordinate
 	chunk.grid_info.world_position = job.world_position
@@ -96,10 +102,10 @@ func _initialize_chunk(
 	# Material
 	#
 	chunk.mat = context.chunk_material
-	print(
-	"coord=", chunk.grid_info.chunk_coordinate,
-	" pos=", chunk.position
-)
+	#print(
+	#"coord=", chunk.grid_info.chunk_coordinate,
+	#" pos=", chunk.grid_info.world_position
+#)
 
 func _initialize_chunk_state(chunk: Chunk) -> void:
 	chunk.deactivate()

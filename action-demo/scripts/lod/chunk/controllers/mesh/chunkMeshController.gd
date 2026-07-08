@@ -21,13 +21,12 @@ func rebuild(
 		return
 
 	cooking_chunks[chunk] = true
-
+	#TODO: UPDATE TO PUSH MESH JOB INTO A QUEUE
 	WorkerThreadPool.add_task(
 		_generate_mesh.bind(chunk, snapshot),
 		true,
 		"Mesh_%s" % chunk.grid_info.chunk_coordinate
 	)
-
 
 func _generate_mesh(
 	chunk: Chunk,
