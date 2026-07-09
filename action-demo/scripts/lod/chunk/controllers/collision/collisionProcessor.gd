@@ -22,5 +22,4 @@ func process(chunk : Chunk) -> void:
 		chunk,
 		snapshot
 	)
-	context.collision_queue.pop_front()
 	chunk.collision_queued = false

@@ -81,3 +81,9 @@ func apply_collision(
 		and chunk.manager.subdivision_controller.has_method("notify_chunk_mesh_ready")
 	):
 		chunk.manager.subdivision_controller.notify_chunk_mesh_ready(chunk)
+	print(
+	"[Collision Applied] ",
+	chunk.grid_info.chunk_coordinate,
+	" faces=",
+	shape.get_faces().size()
+)

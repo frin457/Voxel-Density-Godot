@@ -25,10 +25,6 @@ func instantiate(job: ChunkJob) -> void:
 	)
 
 	context.hierarchy.attach_to_parent(context,chunk)
-	print(
-	"after parent",
-	chunk.global_position
-)
 	chunk.activate()
 	chunk.mark_dirty()
 
@@ -78,11 +74,6 @@ func _initialize_chunk(
 	chunk.lod_level = job.lod_level
 	chunk.current_lod = job.lod_level
 	
-	print(
-		chunk.name,
-		" local=", chunk.position,
-		" global=", chunk.global_position
-	)
 	# Initialize the shared grid description
 	#
 	chunk.grid_info.voxel_size = (
@@ -102,10 +93,6 @@ func _initialize_chunk(
 	# Material
 	#
 	chunk.mat = context.chunk_material
-	#print(
-	#"coord=", chunk.grid_info.chunk_coordinate,
-	#" pos=", chunk.grid_info.world_position
-#)
 
 func _initialize_chunk_state(chunk: Chunk) -> void:
 	chunk.deactivate()

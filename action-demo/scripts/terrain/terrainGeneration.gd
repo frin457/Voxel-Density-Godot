@@ -41,7 +41,7 @@ func generate(
 			var adjusted := pow(normalized, terrain_exponent)
 			var terrain_height := grid.max_world_height * adjusted
 
-			for y in range(grid.max_world_height):
+			for y in range(grid.chunk_size):
 				
 				var world_y = grid.world_position.y + float(y) * grid.voxel_size
 				# Small overlap prevents gaps between chunks
