@@ -1,5 +1,6 @@
 # ./scripts/lod/engine/subDivisionController.gd
 class_name SubdivisionController extends RefCounted
+
 var context = EngineContext
 
 func _init(_context: EngineContext) -> void:
@@ -10,7 +11,6 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 		coord,
 		target_level - 1
 	)
-
 	if parent_chunk == null:
 		return
 	
@@ -19,18 +19,19 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 
 	parent_chunk.subdivision_pending = true
 	
-	if parent_chunk.is_empty_air:
-		parent_chunk.subdivision_pending = false
-		return
+# TODO:
+# Reintroduce empty-chunk culling once
+# surface analysis has been ported.
+# 	if parent_chunk.is_empty_air:
+#     parent_chunk.subdivision_pending = false
+#     return
 	
 	var world_size = context.chunk_lod_size / pow(2, target_level)
-		
 	for x in range(2):
 		for y in range(2):
 			for z in range(2):
 				var child_coord = (coord * 2) + Vector3i(x, y, z)
-				var child_world_pos = parent_chunk.position + (Vector3(x, y, z) * world_size)
-				
+				var child_world_pos = parent_chunk.grid_info.world_position + (Vector3(x, y, z) * world_size)
 				var job = ChunkJob.new(
 					ChunkJob.JobType.GENERATE,
 					child_coord,
@@ -40,6 +41,7 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 					target_level
 				)
 				context.job_queue.push(job)
+	
 
 
 func subdivision_complete(parent_coord: Vector3i, child_level: int) -> void:
@@ -109,7 +111,7 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		context.registry.remove_chunk(child.chunk_coordinate,child.lod_level)
+		context.registry.remove_chunk(child.grid_info.chunk_coordinate,child.lod_level)
 		parent_chunk.child_chunks.erase(child)
 		context.pool.release(child)
 
@@ -130,9 +132,9 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 			return 
 			
 		if context.is_dev:
-			context.diagnostics.log_late_arrival(chunk.chunk_coordinate)
+			context.diagnostics.log_late_arrival(chunk.grid_info.chunk_coordinate)
 			
-		context.registry.remove_chunk(chunk.chunk_coordinate, chunk.lod_level)
+		context.registry.remove_chunk(chunk.grid_info.chunk_coordinate, chunk.lod_level)
 		context.pool.release(chunk)
 		return
 	
@@ -152,6 +154,6 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 
 	if all_siblings_ready:
 		subdivision_complete(
-			parent_chunk.chunk_coordinate,
+			parent_chunk.grid_info.chunk_coordinate,
 			chunk.lod_level
 		)

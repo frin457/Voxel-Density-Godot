@@ -80,3 +80,24 @@ func _get_key(
 		coordinate.z,
 		lod
 	]
+
+func get_highest_existing_lod(
+	coordinate: Vector3i
+) -> int:
+
+	var highest := -1
+
+	for key in _chunks:
+
+		var chunk : Chunk = _chunks[key]
+
+		if !is_instance_valid(chunk):
+			continue
+
+		if chunk.grid_info.chunk_coordinate != coordinate:
+			continue
+
+		if chunk.lod_level > highest:
+			highest = chunk.lod_level
+
+	return max(highest, 0)

@@ -6,17 +6,14 @@ func attach_child(
 	parent: Chunk,
 	child: Chunk
 ) -> void:
-
 	if not is_instance_valid(parent):
 		return
-
 	if not is_instance_valid(child):
 		return
-
-	if not parent.child_chunks.has(child):
-		parent.child_chunks.append(child)
-
 	child.parent_chunk = parent
+
+	if !parent.child_chunks.has(child):
+		parent.child_chunks.append(child)
 
 
 func detach_child(
@@ -71,7 +68,7 @@ func remove_descendants(
 		child.merge_pending = false
 
 		context.registry.remove_chunk(
-			child.chunk_coordinate,
+			child.grid_info.chunk_coordinate,
 			child.lod_level
 		)
 
@@ -92,9 +89,9 @@ func attach_to_parent(
 		return
 
 	var parent_coord := Vector3i(
-		child.chunk_coordinate.x >> 1,
-		child.chunk_coordinate.y >> 1,
-		child.chunk_coordinate.z >> 1
+		child.grid_info.chunk_coordinate.x >> 1,
+		child.grid_info.chunk_coordinate.y >> 1,
+		child.grid_info.chunk_coordinate.z >> 1
 	)
 	
 	var parent_chunk: Chunk = context.registry.get_chunk(parent_coord,child.lod_level - 1)

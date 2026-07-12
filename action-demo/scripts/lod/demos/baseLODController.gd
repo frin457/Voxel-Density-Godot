@@ -41,12 +41,10 @@ func request_lod(
 	coord: Vector3i,
 	level: int
 ) -> void:
-
 	desired_lods[coord] = level
 
 
 func flush() -> void:
-
 	var upgrades := 0
 	var downgrades := 0
 
@@ -56,8 +54,11 @@ func flush() -> void:
 	for coord in desired_lods:
 
 		var desired_level : int = desired_lods[coord]
-		var current_level : int = manager.get_authorized_lod(coord)
-
+		var current_level : int = (
+			manager.context.registry.get_highest_existing_lod(
+				coord
+			)
+		)
 		if desired_level == current_level:
 			continue
 
@@ -72,7 +73,7 @@ func flush() -> void:
 			_request_upgrade(
 				coord,
 				current_level,
-				desired_level
+				current_level + 1
 			)
 
 			upgrades += 1
@@ -88,12 +89,10 @@ func flush() -> void:
 			_request_downgrade(
 				coord,
 				current_level,
-				desired_level
+				current_level - 1
 			)
 
 			downgrades += 1
-
-
 	#
 	# Anything requested last frame but missing now
 	# should gracefully return to LOD 0.
@@ -103,7 +102,7 @@ func flush() -> void:
 		if desired_lods.has(coord):
 			continue
 
-		var current_level := manager.get_authorized_lod(coord)
+		var current_level := manager.context.registry.get_highest_existing_lod(coord)
 
 		if current_level == 0:
 			continue
@@ -132,17 +131,15 @@ func _request_upgrade(
 	_current_level: int,
 	target_level: int
 ) -> void:
-
 	manager.set_authorized_lod(
 		coord,
 		target_level
 	)
-
-	manager.subdivision_requested.emit(
-		coord,
-		target_level,
-		0
-	)
+	if target_level > _current_level:
+		manager.subdivision_requested.emit(
+			coord,
+			target_level
+		)
 
 
 func _request_downgrade(
@@ -150,12 +147,11 @@ func _request_downgrade(
 	_current_level: int,
 	target_level: int
 ) -> void:
-
 	manager.set_authorized_lod(
 		coord,
 		target_level
 	)
-
-	manager.merge_requested.emit(
-		coord
-	)
+	if target_level - 1 >= 0 and target_level < _current_level:
+		manager.merge_requested.emit(
+			coord
+		)

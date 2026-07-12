@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c8hr7vrqull40" path="res://scripts/lod/tests/debug/sandbox/engineSandbox.gd" id="1_i7ld0"]
 [ext_resource type="Script" uid="uid://bvcavytcq7ray" path="res://scripts/lod/engine/chunkManager.gd" id="2_7j3km"]
+[ext_resource type="Script" uid="uid://dv013qfo57ehx" path="res://scripts/lod/demos/playerLODController.gd" id="3_6ac5w"]
 [ext_resource type="PackedScene" uid="uid://co68l2ekwhii8" path="res://controller/unit/player.tscn" id="4_6ac5w"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7j3km"]
@@ -16,10 +17,12 @@ script = ExtResource("1_i7ld0")
 
 [node name="ChunkManager" type="Node" parent="." unique_id=1184542629]
 script = ExtResource("2_7j3km")
-dimensions = Vector3(64, 10, 64)
-voxel_size = 0.25
+dimensions = Vector3(128, 16, 128)
 chunk_material = SubResource("StandardMaterial3D_7j3km")
 colors = Array[Color]([Color(0.31354445, 0.8761756, 0.3984938, 1), Color(0, 0.50980395, 0, 1), Color(0.11372549, 0.23529412, 0.07450981, 1), Color(0.3764706, 0.17254902, 0.11764706, 1), Color(0.3131077, 0.3151989, 0.46158457, 1), Color(0.11372549, 0.11764706, 0.07450981, 1)])
+
+[node name="LOD" type="Node" parent="ChunkManager" unique_id=578996313]
+script = ExtResource("3_6ac5w")
 
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("4_6ac5w")]
 input_capture_on_drag = true
