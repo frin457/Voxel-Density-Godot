@@ -170,6 +170,15 @@ func _on_structural_impact_area_requested(
 # ==================================================
 # INTERNAL
 # ==================================================
+func world_to_chunk_coordinate(
+	world_position: Vector3
+) -> Vector3i:
+
+	return Vector3i(
+		floor(world_position.x / chunk_lod_size),
+		floor(world_position.y / chunk_lod_size),
+		floor(world_position.z / chunk_lod_size)
+	)
 
 func _sanitize_world_settings() -> void:
 

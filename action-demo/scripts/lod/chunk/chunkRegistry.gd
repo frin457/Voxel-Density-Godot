@@ -1,13 +1,10 @@
 # ./scripts/lod/chunk/chunkRegistry.gd
-class_name ChunkRegistry
-extends RefCounted
-
+class_name ChunkRegistry extends RefCounted
 var _chunks: Dictionary = {}
 
 # ==================================================
 # PUBLIC API
 # ==================================================
-
 func register_chunk(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
 		return
@@ -81,23 +78,26 @@ func _get_key(
 		lod
 	]
 
-func get_highest_existing_lod(
-	coordinate: Vector3i
-) -> int:
 
-	var highest := -1
+func get_highest_existing_lod(coordinate: Vector3i) -> int:
+	for lod in range(10, -1, -1):
+		if has_chunk(coordinate, lod):
+			return lod
+	return 0
 
-	for key in _chunks:
 
-		var chunk : Chunk = _chunks[key]
+func get_all_chunks() -> Array[Chunk]:
+	var results : Array[Chunk] = []
 
-		if !is_instance_valid(chunk):
-			continue
+	for value in _chunks.values():
+		results.append(value)
+	return results
 
-		if chunk.grid_info.chunk_coordinate != coordinate:
-			continue
 
-		if chunk.lod_level > highest:
-			highest = chunk.lod_level
+func get_chunks_at_lod(lod: int) -> Array[Chunk]:
+	var results : Array[Chunk] = []
 
-	return max(highest, 0)
+	for chunk in _chunks.values():
+		if chunk.lod_level == lod:
+			results.append(chunk)
+	return results

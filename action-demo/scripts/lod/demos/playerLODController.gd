@@ -1,8 +1,9 @@
 # ./scripts/lod/playerLODController.gd
 class_name PlayerLODController extends BaseLODController
 
-const ROTATION_THRESHOLD := 0.95
+@export var target: Node3D
 
+const ROTATION_THRESHOLD := 0.95
 # Desired LOD radii (measured in chunks)
 const HIGH_RADIUS := 1
 const MEDIUM_RADIUS := 3
@@ -16,28 +17,30 @@ var last_forward_vector := Vector3.ZERO
 
 func _ready() -> void:
 	super._ready()
+
 	if manager == null:
 		push_error("PlayerLODController: Missing ChunkManager.")
 		return
-
 	chunk_lod_size = manager.chunk_lod_size
+	# Default to the active camera if no explicit target
+	# has been assigned in the editor.
+	if target == null:
+		target = get_viewport().get_camera_3d()
+	if target == null:
+		push_error("PlayerLODController: Missing tracking target.")
 
 
 func _process(_delta: float) -> void:
-	var camera := get_viewport().get_camera_3d()
-
-	if camera == null:
+	if target == null:
 		return
+	var player_position := target.global_position
 
-	var player_position := camera.global_position
 
-	var center_coord := Vector3i(
-		floor(player_position.x / chunk_lod_size),
-		floor(player_position.y / chunk_lod_size),
-		floor(player_position.z / chunk_lod_size)
+	var center_coord := manager.world_to_chunk_coordinate(
+		player_position
 	)
 	
-	var forward := -camera.global_transform.basis.z.normalized()
+	var forward := -target.global_transform.basis.z.normalized()
 
 	var moved_chunk := (
 		center_coord != last_chunk_coordinate
