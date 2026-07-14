@@ -136,6 +136,7 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 			
 		context.registry.remove_chunk(chunk.grid_info.chunk_coordinate, chunk.lod_level)
 		context.pool.release(chunk)
+		context.wireframe_controller.remove_chunk(chunk)
 		return
 	
 	var all_siblings_ready := true

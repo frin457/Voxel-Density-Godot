@@ -1,12 +1,17 @@
 #./scripts/lod/chunk/controllers/chunkMeshController.gd
 class_name ChunkMeshController extends RefCounted
 
-var active_mesher: BaseMesher = StandardMesher.new()
 
-# Internal State Tracking (Moved from Chunk)
+# Internal State Tracking
 var cooking_chunks : Dictionary = {}
 var stale_chunks : Dictionary = {}
 var pending_surfaces : Dictionary = {}
+var active_mesher: BaseMesher = StandardMesher.new()
+
+var context: EngineContext
+func _init(_context: EngineContext) -> void:
+	context = _context
+
 
 func rebuild(
 	chunk: Chunk,
@@ -52,7 +57,7 @@ func _mesh_complete(chunk: Chunk) -> void:
 		return
 
 	apply_mesh(chunk)
-
+	
 
 func apply_mesh(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
@@ -72,8 +77,10 @@ func apply_mesh(chunk: Chunk) -> void:
 
 	chunk.mesh_dirty = false
 	chunk.collision_dirty = true
+	if context.lod_wireframes:
+		context.lod_wireframes.update_chunk(chunk)
 	
 	# Cleanup memory
 	pending_surfaces.erase(chunk)
 	
-	chunk.manager.queue_collision_chunk(chunk)
+	context.queue_controller.queue_collision(chunk)

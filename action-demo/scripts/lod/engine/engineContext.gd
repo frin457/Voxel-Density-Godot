@@ -1,5 +1,5 @@
-class_name EngineContext
-extends RefCounted
+#res://scripts/lod/engine/engineContext.gd
+class_name EngineContext extends RefCounted
 
 var is_dev := false
 
@@ -15,7 +15,6 @@ var world_generation_controller: WorldGenerationController
 # ==================================================
 # ENGINE SERVICES
 # ==================================================
-
 var registry: ChunkRegistry
 var pool: ChunkPool
 var chunk_instantiator: ChunkInstantiationController
@@ -27,9 +26,9 @@ var dirty_processor: DirtyChunkProcessor
 var collision_processor: CollisionProcessor
 
 var mesh_controller: ChunkMeshController
-var collision_controller: CollisionController
-
 var mesh_snapshot_factory: MeshSnapshotFactory
+
+var collision_controller: CollisionController
 var collision_snapshot_controller: CollisionSnapshotController
 
 var subdivision_planner: SubdivisionPlanner
@@ -39,7 +38,7 @@ var hierarchy: ChunkHierarchyController
 var activation: ActivationController
 
 var diagnostics: DiagnosticsController
-
+var lod_wireframes: WireframeLODController
 # ==================================================
 # WORK QUEUES
 # ==================================================

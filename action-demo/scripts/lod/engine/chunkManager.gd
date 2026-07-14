@@ -234,19 +234,25 @@ func _initialize_context() -> void:
 	#--------------------------------------------------
 	# Engine Controllers
 	#--------------------------------------------------
-	context.mesh_controller = ChunkMeshController.new()
-	context.collision_controller = CollisionController.new()
 	context.hierarchy = ChunkHierarchyController.new()
+	context.mesh_controller = ChunkMeshController.new(context)
+	context.collision_controller = CollisionController.new()
+	## LOD
 	context.subdivision_planner = SubdivisionPlanner.new()
 	context.merge_planner = MergePlanner.new()
 	subdivision_controller = SubdivisionController.new(context)
-	context.diagnostics = DiagnosticsController.new(context)
+	## ASYNC
 	context.queue_controller = QueueController.new(context)
 	context.dirty_processor = DirtyChunkProcessor.new(context)
 	context.collision_processor = CollisionProcessor.new(context)
+	## INIT
 	context.chunk_instantiator = ChunkInstantiationController.new(context)
 	context.thread_manager = ThreadManager.new(context)
 	context.world_generation_controller = WorldGenerationController.new(context)
+	## DEBUG
+	context.diagnostics = DiagnosticsController.new(context)
+	context.lod_wireframes = WireframeLODController.new(context)
+	add_child(context.lod_wireframes)
 	#--------------------------------------------------
 	# Mirror references (optional)
 	#--------------------------------------------------
