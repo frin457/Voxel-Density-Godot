@@ -46,7 +46,8 @@ var terrain_generator := TerrainGenerator.new()
 var terrain_noise := FastNoiseLite.new()
 var voxel_data_controller := VoxelDataController.new()
 
-var registry := ChunkRegistry.new()
+var chunk_state_controller : ChunkStateController
+var index := ChunkIndex.new()
 var pool := ChunkPool
 
 var hierarchy: ChunkHierarchyController
@@ -218,11 +219,12 @@ func _initialize_context() -> void:
 	#--------------------------------------------------
 	# Core Services
 	#--------------------------------------------------
-	context.registry = ChunkRegistry.new()
+	context.index = ChunkIndex.new()
 	context.pool = ChunkPool.new(
 		context.chunk_scene,
 		self
 	)
+	context.chunk_state = ChunkStateController.new()
 	context.terrain_generator = TerrainGenerator.new()
 	context.voxel_data_controller = VoxelDataController.new()
 	context.job_queue = ChunkJobQueue.new()
@@ -256,7 +258,8 @@ func _initialize_context() -> void:
 	#--------------------------------------------------
 	# Mirror references (optional)
 	#--------------------------------------------------
-	registry = context.registry
+	index = context.index
+	chunk_state_controller = context.chunk_state
 	thread_manager = context.thread_manager
 	queue_controller = context.queue_controller
 	dirty_processor = context.dirty_processor

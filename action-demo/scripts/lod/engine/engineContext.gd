@@ -15,10 +15,11 @@ var world_generation_controller: WorldGenerationController
 # ==================================================
 # ENGINE SERVICES
 # ==================================================
-var registry: ChunkRegistry
+var registry: ChunkIndex
 var pool: ChunkPool
 var chunk_instantiator: ChunkInstantiationController
 
+var chunk_state : ChunkStateController
 var voxel_data_controller: VoxelDataController
 var terrain_generator: TerrainGenerator
 
@@ -39,16 +40,13 @@ var activation: ActivationController
 
 var diagnostics: DiagnosticsController
 var lod_wireframes: WireframeLODController
+
 # ==================================================
 # WORK QUEUES
 # ==================================================
-
 var queue_controller: QueueController
-
 var job_queue := ChunkJobQueue.new()
-
 var active_thread_tasks: Array[int] = []
-
 var dirty_queue: Array[Chunk] = []
 var collision_queue: Array[Chunk] = []
 

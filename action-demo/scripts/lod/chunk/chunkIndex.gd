@@ -1,5 +1,5 @@
 # ./scripts/lod/chunk/chunkRegistry.gd
-class_name ChunkRegistry extends RefCounted
+class_name ChunkIndex extends RefCounted
 var _chunks: Dictionary = {}
 
 # ==================================================
