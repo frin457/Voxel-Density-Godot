@@ -111,7 +111,11 @@ func reset() -> void:
 # ==================================================
 
 func mark_dirty() -> void:
-
+	print(
+	"mark_dirty ",
+	grid_info.chunk_coordinate,
+	" collision=", collision_dirty
+)
 	if mesh_dirty and collision_dirty:
 		return
 

@@ -25,6 +25,7 @@ colors = Array[Color]([Color(0.31354445, 0.8761756, 0.3984938, 1), Color(0, 0.50
 script = ExtResource("3_6ac5w")
 
 [node name="Player" parent="." unique_id=532470067 instance=ExtResource("4_6ac5w")]
+transform = Transform3D(-0.1, 0, -8.742278e-09, 0, 0.1, 0, 8.742278e-09, 0, -0.1, 0, 15, 0)
 input_capture_on_drag = true
 chunk_size = 1.0
 

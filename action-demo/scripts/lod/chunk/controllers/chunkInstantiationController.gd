@@ -9,6 +9,7 @@ func _init(_context: EngineContext) -> void:
 
 
 func instantiate(job: ChunkJob) -> void:
+	#print("Instantiate", job.chunk_coordinate, " ", job.lod_level)
 	if not _validate_job(job):
 		return
 	if context.registry.has_chunk(job.chunk_coordinate, job.lod_level):
@@ -25,8 +26,8 @@ func instantiate(job: ChunkJob) -> void:
 	)
 
 	context.hierarchy.attach_to_parent(context,chunk)
-	chunk.activate()
 	chunk.mark_dirty()
+	chunk.activate()
 
 func _validate_job(job: ChunkJob) -> bool:
 	var base_coord := job.chunk_coordinate
