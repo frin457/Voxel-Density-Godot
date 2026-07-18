@@ -9,23 +9,29 @@ func _init(_context: EngineContext) -> void:
 
 
 func instantiate(job: ChunkJob) -> void:
-	#print("Instantiate", job.chunk_coordinate, " ", job.lod_level)
-	if not _validate_job(job):
-		return
-	if context.registry.has_chunk(job.chunk_coordinate, job.lod_level):
-		return
+
+	if not _validate_job(job): return
+	if context.index.has_chunk(
+		job.chunk_coordinate,
+		job.lod_level
+	): return
+
 	var chunk := _create_chunk()
-	
+
 	_initialize_chunk(chunk, job)
-	_initialize_chunk_state(chunk)
-	context.registry.register_chunk(chunk)
+	_register_chunk_state(chunk)
+	context.index.register_chunk(chunk)
 
 	context.voxel_data_controller.set_voxel_data(
 		chunk.voxel_data,
 		job.data
 	)
 
-	context.hierarchy.attach_to_parent(context,chunk)
+	context.hierarchy.attach_to_parent(
+		context,
+		chunk
+	)
+
 	chunk.mark_dirty()
 	chunk.activate()
 
@@ -52,7 +58,7 @@ func _validate_job(job: ChunkJob) -> bool:
 				job.lod_level,
 				authorized
 			)
-		context.registry.remove_chunk(
+		context.index.remove_chunk(
 			job.chunk_coordinate,
 			job.lod_level
 		)
@@ -95,5 +101,5 @@ func _initialize_chunk(
 	#
 	chunk.mat = context.chunk_material
 
-func _initialize_chunk_state(chunk: Chunk) -> void:
-	chunk.deactivate()
+func _register_chunk_state(chunk: Chunk) -> void:
+	context.chunk_state.register_chunk(chunk)

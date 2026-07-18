@@ -225,6 +225,11 @@ func _initialize_context() -> void:
 		self
 	)
 	context.chunk_state = ChunkStateController.new()
+
+	print(
+		"ChunkStateController initialized:",
+		context.chunk_state
+	)
 	context.terrain_generator = TerrainGenerator.new()
 	context.voxel_data_controller = VoxelDataController.new()
 	context.job_queue = ChunkJobQueue.new()

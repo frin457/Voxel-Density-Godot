@@ -15,7 +15,7 @@ var world_generation_controller: WorldGenerationController
 # ==================================================
 # ENGINE SERVICES
 # ==================================================
-var registry: ChunkIndex
+var index: ChunkIndex
 var pool: ChunkPool
 var chunk_instantiator: ChunkInstantiationController
 

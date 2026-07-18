@@ -1,5 +1,5 @@
 #res://scripts/lod/chunk/controllers/state/ChunkStateController.gd
-class_name ChunkStateController extends Node
+class_name ChunkStateController extends RefCounted
 
 # ==================================================
 # STATE STORAGE
@@ -12,15 +12,32 @@ var _states: Dictionary = {}
 # LIFECYCLE
 # ==================================================
 
+#func register_chunk(chunk: Chunk) -> void:
+	#if not is_instance_valid(chunk):
+		#return
+#
+	#if _states.has(chunk):
+		#return
+#
+	#_states[chunk] = ChunkRuntimeState.new()
+	
+
 func register_chunk(chunk: Chunk) -> void:
+	print("REGISTER ATTEMPT", chunk)
+
 	if not is_instance_valid(chunk):
 		return
 
 	if _states.has(chunk):
+		print("Already registered")
 		return
 
 	_states[chunk] = ChunkRuntimeState.new()
 
+	print(
+		"Registered chunk state:",
+		chunk.grid_info.chunk_coordinate
+	)
 
 func unregister_chunk(chunk: Chunk) -> void:
 	_states.erase(chunk)

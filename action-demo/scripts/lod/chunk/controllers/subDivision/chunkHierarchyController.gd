@@ -67,7 +67,7 @@ func remove_descendants(
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		context.registry.remove_chunk(
+		context.index.remove_chunk(
 			child.grid_info.chunk_coordinate,
 			child.lod_level
 		)
@@ -94,7 +94,7 @@ func attach_to_parent(
 		child.grid_info.chunk_coordinate.z >> 1
 	)
 	
-	var parent_chunk: Chunk = context.registry.get_chunk(parent_coord,child.lod_level - 1)
+	var parent_chunk: Chunk = context.index.get_chunk(parent_coord,child.lod_level - 1)
 	if parent_chunk == null:
 		return
 

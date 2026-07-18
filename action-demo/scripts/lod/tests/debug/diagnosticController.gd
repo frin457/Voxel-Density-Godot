@@ -19,8 +19,8 @@ func snapshot() -> Dictionary:
 	var pending_subdivisions := 0
 	var pending_merges := 0
 
-	if context and context.registry:
-		for chunk in context.registry.values():
+	if context and context.index:
+		for chunk in context.index.values():
 			if !is_instance_valid(chunk):
 				continue
 
@@ -32,8 +32,8 @@ func snapshot() -> Dictionary:
 
 	return {
 		"Chunks":
-			context.registry.size()
-			if context and context.registry
+			context.index.size()
+			if context and context.index
 			else 0,
 
 		"Pool":

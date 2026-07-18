@@ -7,7 +7,7 @@ func _init(_context: EngineContext) -> void:
 	context = _context
 
 func request_subdivision(coord: Vector3i, target_level: int) -> void:
-	var parent_chunk : Chunk = context.registry.get_chunk(
+	var parent_chunk : Chunk = context.index.get_chunk(
 		coord,
 		target_level - 1
 	)
@@ -45,7 +45,7 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 
 
 func subdivision_complete(parent_coord: Vector3i, child_level: int) -> void:
-	var parent_chunk : Chunk = context.registry.get_chunk(
+	var parent_chunk : Chunk = context.index.get_chunk(
 		parent_coord,
 		child_level - 1
 	)
@@ -63,7 +63,7 @@ func subdivision_complete(parent_coord: Vector3i, child_level: int) -> void:
 
 
 func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
-	var parent_chunk : Chunk = context.registry.get_chunk(
+	var parent_chunk : Chunk = context.index.get_chunk(
 		parent_coord,
 		parent_level
 	)
@@ -83,8 +83,8 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 		for y in range(2):
 			for z in range(2):
 				var child_coord = (parent_coord * 2) + Vector3i(x, y, z)			
-				if context.registry.has_chunk(child_coord, parent_level + 1):
-					var child_chunk = context.registry.get_chunk(child_coord, parent_level + 1)
+				if context.index.has_chunk(child_coord, parent_level + 1):
+					var child_chunk = context.index.get_chunk(child_coord, parent_level + 1)
 					child_chunk.subdivision_pending = false
 					child_chunk.merge_pending = false
 
@@ -111,7 +111,8 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 		child.subdivision_pending = false
 		child.merge_pending = false
 
-		context.registry.remove_chunk(child.grid_info.chunk_coordinate,child.lod_level)
+		context.index.remove_chunk(child.grid_info.chunk_coordinate,child.lod_level)
+		context.chunk_state.unregister_chunk(child)
 		parent_chunk.child_chunks.erase(child)
 		context.pool.release(child)
 
@@ -134,9 +135,10 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 		if context.is_dev:
 			context.diagnostics.log_late_arrival(chunk.grid_info.chunk_coordinate)
 			
-		context.registry.remove_chunk(chunk.grid_info.chunk_coordinate, chunk.lod_level)
-		context.pool.release(chunk)
+		context.index.remove_chunk(chunk.grid_info.chunk_coordinate, chunk.lod_level)
 		context.wireframe_controller.remove_chunk(chunk)
+		context.chunk_state.unregister_chunk(chunk)
+		context.pool.release(chunk)
 		return
 	
 	var all_siblings_ready := true

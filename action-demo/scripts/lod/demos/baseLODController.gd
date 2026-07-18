@@ -55,7 +55,7 @@ func flush() -> void:
 
 		var desired_level : int = desired_lods[coord]
 		var current_level : int = (
-			manager.context.registry.get_highest_existing_lod(
+			manager.context.index.get_highest_existing_lod(
 				coord
 			)
 		)
@@ -102,7 +102,7 @@ func flush() -> void:
 		if desired_lods.has(coord):
 			continue
 
-		var current_level := manager.context.registry.get_highest_existing_lod(coord)
+		var current_level := manager.context.index.get_highest_existing_lod(coord)
 
 		if current_level == 0:
 			continue

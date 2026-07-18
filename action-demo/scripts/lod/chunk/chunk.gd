@@ -86,7 +86,6 @@ func deactivate() -> void:
 # ==================================================
 
 func reset() -> void:
-
 	parent_chunk = null
 	child_chunks.clear()
 
@@ -95,15 +94,6 @@ func reset() -> void:
 	lod_level = 0
 	current_lod = 0
 
-	mesh_dirty = false
-	mesh_queued = false
-
-	collision_dirty = false
-	collision_queued = false
-
-	subdivision_pending = false
-	merge_pending = false
-
 	mat = null
 
 # ==================================================
@@ -111,17 +101,6 @@ func reset() -> void:
 # ==================================================
 
 func mark_dirty() -> void:
-	print(
-	"mark_dirty ",
-	grid_info.chunk_coordinate,
-	" collision=", collision_dirty
-)
-	if mesh_dirty and collision_dirty:
-		return
-
-	mesh_dirty = true
-	collision_dirty = true
-
 	if manager:
 		manager.context.diagnostics.log_dirty_queued(self)
 		manager.queue_dirty_chunk(self)
