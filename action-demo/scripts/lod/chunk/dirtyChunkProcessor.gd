@@ -30,4 +30,4 @@ func process(chunk: Chunk) -> void:
 		chunk,
 		snapshot
 	)
-	chunk.mesh_queued = false
+	context.chunk_state.dequeue_mesh(chunk)

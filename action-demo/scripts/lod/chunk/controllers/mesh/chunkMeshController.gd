@@ -9,9 +9,9 @@ var pending_surfaces : Dictionary = {}
 var active_mesher: BaseMesher = StandardMesher.new()
 
 var context: EngineContext
+
 func _init(_context: EngineContext) -> void:
 	context = _context
-
 
 func rebuild(
 	chunk: Chunk,
@@ -76,7 +76,7 @@ func apply_mesh(chunk: Chunk) -> void:
 		chunk.meshInstance.mesh = null
 
 	chunk.mesh_dirty = false
-	chunk.collision_dirty = true
+	context.chunk_state.pending.collision_dirty = true
 	if context.lod_wireframes:
 		context.lod_wireframes.update_chunk(chunk)
 	

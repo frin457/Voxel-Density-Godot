@@ -13,12 +13,10 @@ func process() -> void:
 # PUBLIC API
 # ==================================================
 func queue_dirty(chunk: Chunk) -> void:
-	if !is_instance_valid(chunk):
-		return
-	if chunk.mesh_queued:
-		return
-	chunk.mesh_queued = true
-	context.dirty_queue.append(chunk)
+	if !is_instance_valid(chunk): return
+	var state = context.chunk_state.get_state(chunk)
+	if state.queue.mesh: return
+	context.chunk_state.queue_mesh(chunk)
 
 
 func queue_collision(chunk: Chunk) -> void:
