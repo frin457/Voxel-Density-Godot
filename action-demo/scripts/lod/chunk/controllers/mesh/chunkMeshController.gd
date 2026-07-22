@@ -26,7 +26,6 @@ func rebuild(
 		return
 
 	cooking_chunks[chunk] = true
-	#TODO: UPDATE TO PUSH MESH JOB INTO A QUEUE
 	WorkerThreadPool.add_task(
 		_generate_mesh.bind(chunk, snapshot),
 		true,
@@ -75,7 +74,8 @@ func apply_mesh(chunk: Chunk) -> void:
 	else:
 		chunk.meshInstance.mesh = null
 
-	chunk.mesh_dirty = false
+
+	context.chunk_state.pending.mesh_dirty = true
 	context.chunk_state.pending.collision_dirty = true
 	if context.lod_wireframes:
 		context.lod_wireframes.update_chunk(chunk)

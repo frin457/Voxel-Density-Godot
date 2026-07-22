@@ -1,5 +1,4 @@
-class_name Chunk
-extends StaticBody3D
+class_name Chunk extends StaticBody3D
 
 # ==================================================
 # CORE OWNERSHIP
@@ -23,10 +22,7 @@ var current_lod := 0
 # ==================================================
 
 var mesh_dirty := false
-var mesh_queued := false
-
 var collision_dirty := false
-var collision_queued := false
 
 var subdivision_pending := false
 var merge_pending := false
