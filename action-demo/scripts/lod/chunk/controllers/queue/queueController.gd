@@ -22,18 +22,14 @@ func queue_dirty(chunk: Chunk) -> void:
 
 
 func queue_collision(chunk: Chunk) -> void:
+	if not is_instance_valid(chunk): return
+	
+	var state = context.chunk_state.get_state(chunk)
+	
+	if !state.pending.collision_dirty: return
+	if state.queue.collision: return
 
-	if not is_instance_valid(chunk):
-		return
-
-	if not chunk.collision_dirty:
-		return
-
-	if chunk.collision_queued:
-		return
-
-	chunk.collision_queued = true
-
+	context.chunk_state.queue_collision(chunk)
 	context.collision_queue.append(chunk)
 
 func _process_dirty() -> void:

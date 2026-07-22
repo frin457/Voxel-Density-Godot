@@ -243,7 +243,7 @@ func _initialize_context() -> void:
 	#--------------------------------------------------
 	context.hierarchy = ChunkHierarchyController.new()
 	context.mesh_controller = ChunkMeshController.new(context)
-	context.collision_controller = CollisionController.new()
+	context.collision_controller = CollisionController.new(context)
 	## LOD
 	context.subdivision_planner = SubdivisionPlanner.new()
 	context.merge_planner = MergePlanner.new()

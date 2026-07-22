@@ -8,15 +8,16 @@ func _init(_context: EngineContext) -> void:
 
 
 func process(chunk: Chunk) -> void:
-	if not is_instance_valid(chunk):
-		return
-
-	if chunk.is_queued_for_deletion():
-		return
-
+	if not is_instance_valid(chunk): return
+	
+	var state = context.chunk_state.get_state(chunk)
+	
+	if chunk.is_queued_for_deletion(): return
+	
 	context.dirty_queue_processed_this_frame += 1
-	if not chunk.mesh_dirty:
-		return
+	
+	if !state.pending.mesh_dirty: return
+	
 	var snapshot := context.mesh_snapshot_factory.create_snapshot(
 	chunk.voxel_data,
 	chunk.grid_info

@@ -1,11 +1,15 @@
 #./scripts/lod/chunk/controllers/CollisionController.gd
 class_name CollisionController extends RefCounted
 
+var context: EngineContext
+
 var cooking_chunks : Dictionary = {}
 var stale_chunks : Dictionary = {}
 var pending_shapes : Dictionary = {}
 
-
+func _init(_context: EngineContext) -> void:
+	context = _context
+	
 func rebuild(
 	chunk: Chunk,
 	snapshot: CollisionSnapshot
@@ -19,9 +23,12 @@ func rebuild(
 		return
 
 	if snapshot.faces.is_empty():
-		chunk.collision_dirty = false
+
+		context.chunk_state.clear_collision_dirty(chunk)
+
 		if chunk.collisionShape:
 			chunk.collisionShape.shape = null
+
 		return
 
 	cooking_chunks[chunk] = true
@@ -74,7 +81,7 @@ func apply_collision(
 		chunk.collisionShape.shape = shape
 		var overlap_scale = 1 # Adjust this if you need more/less overlap
 		chunk.collisionShape.scale = Vector3(overlap_scale, overlap_scale, overlap_scale)
-	chunk.collision_dirty = false
+	context.chunk_state.clear_collision_dirty(chunk)
 
 	if (
 		chunk.manager

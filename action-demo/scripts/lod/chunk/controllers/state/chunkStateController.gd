@@ -11,17 +11,6 @@ var _states: Dictionary = {}
 # ==================================================
 # LIFECYCLE
 # ==================================================
-
-#func register_chunk(chunk: Chunk) -> void:
-	#if not is_instance_valid(chunk):
-		#return
-#
-	#if _states.has(chunk):
-		#return
-#
-	#_states[chunk] = ChunkRuntimeState.new()
-	
-
 func register_chunk(chunk: Chunk) -> void:
 	if not is_instance_valid(chunk):
 		return
@@ -257,7 +246,18 @@ func mark_collision_dirty(chunk: Chunk) -> void:
 
 	state.pending.collision_dirty = true
 	_touch(state)
+
+func clear_mesh_dirty(chunk: Chunk) -> void:
+	var state := get_state(chunk)
+
+	state.pending.mesh_dirty = false
+	_touch(state)
 	
+func clear_collision_dirty(chunk : Chunk) -> void:
+	var state := get_state(chunk)
+	state.pending.collision_dirty = false
+	_touch(state)
+
 # ==================================================
 # QUERIES
 # ==================================================
