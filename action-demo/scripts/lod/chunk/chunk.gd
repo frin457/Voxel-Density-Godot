@@ -97,10 +97,18 @@ func reset() -> void:
 	mat = null
 
 # ==================================================
-# DIRTY STATE
+# STATE
 # ==================================================
 
 func mark_dirty() -> void:
+
 	if manager:
+		var state = manager.context.chunk_state
+
+		state.mark_mesh_dirty(self)
+		state.mark_collision_dirty(self)
+		state.mark_stale(self)
+
 		manager.context.diagnostics.log_dirty_queued(self)
+
 		manager.queue_dirty_chunk(self)

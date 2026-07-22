@@ -23,21 +23,12 @@ var _states: Dictionary = {}
 	
 
 func register_chunk(chunk: Chunk) -> void:
-	print("REGISTER ATTEMPT", chunk)
-
 	if not is_instance_valid(chunk):
 		return
 
-	if _states.has(chunk):
-		print("Already registered")
-		return
+	if _states.has(chunk): return
 
 	_states[chunk] = ChunkRuntimeState.new()
-
-	print(
-		"Registered chunk state:",
-		chunk.grid_info.chunk_coordinate
-	)
 
 func unregister_chunk(chunk: Chunk) -> void:
 	_states.erase(chunk)
@@ -249,7 +240,24 @@ func clear_merge_pending(chunk: Chunk) -> void:
 	state.pending.merge = false
 	_touch(state)
 
+func mark_mesh_dirty(chunk: Chunk) -> void:
+	var state := get_state(chunk)
 
+	state.pending.mesh_dirty = true
+	print(
+	"Mesh dirty state:",
+	chunk.grid_info.chunk_coordinate,
+	state.pending.mesh_dirty
+	)
+	_touch(state)
+
+
+func mark_collision_dirty(chunk: Chunk) -> void:
+	var state := get_state(chunk)
+
+	state.pending.collision_dirty = true
+	_touch(state)
+	
 # ==================================================
 # QUERIES
 # ==================================================
