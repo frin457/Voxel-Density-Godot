@@ -75,8 +75,8 @@ func apply_mesh(chunk: Chunk) -> void:
 		chunk.meshInstance.mesh = null
 
 
-	context.chunk_state.pending.mesh_dirty = true
-	context.chunk_state.pending.collision_dirty = true
+	context.chunk_state.clear_mesh_dirty(chunk)
+	context.chunk_state.mark_collision_dirty(chunk)
 	if context.lod_wireframes:
 		context.lod_wireframes.update_chunk(chunk)
 	

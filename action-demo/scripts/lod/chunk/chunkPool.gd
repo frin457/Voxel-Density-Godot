@@ -1,6 +1,7 @@
 #./scripts/lod/chunk/chunkPool.gd
 class_name ChunkPool extends RefCounted
 
+var context : EngineContext
 var scene : PackedScene
 var scene_root : Node
 
@@ -27,12 +28,12 @@ func acquire() -> Chunk:
 
 
 func release(chunk: Chunk) -> void:
-	if not is_instance_valid(chunk):
-		return
-
+	if not is_instance_valid(chunk): return
+	context.chunk_state.unregister_chunk(chunk)
 	chunk.reset()
 	chunk.deactivate()
 	inactive_chunks.append(chunk)
+	
 
 
 func clear() -> void:

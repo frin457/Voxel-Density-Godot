@@ -1,4 +1,5 @@
 class_name Chunk extends StaticBody3D
+# SEE `chunkStateController.gd` FOR STATE MANAGEMENT
 
 # ==================================================
 # CORE OWNERSHIP
@@ -16,16 +17,6 @@ var active := true
 
 var lod_level := 0
 var current_lod := 0
-
-# ==================================================
-# PIPELINE STATE
-# ==================================================
-
-var mesh_dirty := false
-var collision_dirty := false
-
-var subdivision_pending := false
-var merge_pending := false
 
 # ==================================================
 # VISUALS
