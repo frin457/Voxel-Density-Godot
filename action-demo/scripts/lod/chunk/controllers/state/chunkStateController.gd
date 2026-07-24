@@ -283,25 +283,33 @@ func is_idle(chunk: Chunk) -> bool:
 func is_stale(chunk: Chunk) -> bool:
 	return get_state(chunk).stale
 
+
 # ==================================================
 # STATE QUERIES
 # ==================================================
 func is_mesh_dirty(chunk: Chunk) -> bool:
 	var state := get_state(chunk)
 	return state.pending.mesh_dirty
-	
+
 func is_collision_dirty(chunk: Chunk) -> bool:
 	var state := get_state(chunk)
 	return state.pending.collision_dirty
-	
+
 func is_mesh_queued(chunk: Chunk) -> bool:
 	var state := get_state(chunk)
 	return state.queue.mesh
-	
+
 func is_collision_queued(chunk: Chunk) -> bool:
 	var state := get_state(chunk)
 	return state.queue.collision
-	
+
+func is_subdivision_pending(chunk: Chunk) -> bool:
+	return get_state(chunk).pending.subdivision
+
+func is_merge_pending(chunk: Chunk) -> bool:
+	return get_state(chunk).pending.merge
+
+
 # ==================================================
 # INTERNAL
 # ==================================================

@@ -11,19 +11,15 @@ func request_subdivision(coord: Vector3i, target_level: int) -> void:
 		coord,
 		target_level - 1
 	)
-	if parent_chunk == null:
-		return
-	
-	if parent_chunk.subdivision_pending:
-		return
-
-	parent_chunk.subdivision_pending = true
+	if parent_chunk == null: return
+	if context.chunk_state.is_subdivision_pending(parent_chunk): return
+	context.chunk_state.mark_subdivision_pending(parent_chunk)
 	
 # TODO:
 # Reintroduce empty-chunk culling once
 # surface analysis has been ported.
 # 	if parent_chunk.is_empty_air:
-#     parent_chunk.subdivision_pending = false
+#     context.chunk_state.clear_subdivision_pending(parent_chunk)
 #     return
 	
 	var world_size = context.chunk_lod_size / pow(2, target_level)
@@ -49,10 +45,8 @@ func subdivision_complete(parent_coord: Vector3i, child_level: int) -> void:
 		parent_coord,
 		child_level - 1
 	)
-	if parent_chunk == null:
-		return
-	
-	parent_chunk.subdivision_pending = false
+	if parent_chunk == null: return
+	context.chunk_state.clear_subdivision_pending(parent_chunk)
 	parent_chunk.current_lod = child_level 
 	
 	for child in parent_chunk.child_chunks:
@@ -68,13 +62,9 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 		parent_level
 	)
 
-	if parent_chunk == null:
-		return
-	if parent_chunk.merge_pending:
-		return
-
-	parent_chunk.merge_pending = true
-
+	if parent_chunk == null: return
+	if context.chunk_state.is_merge_pending(parent_chunk): return
+	context.chunk_state.mark_merge_pending(parent_chunk)
 	# 1. Clear the gate for this parent chunk level
 	parent_chunk.subdivision_pending = false
 	
@@ -85,8 +75,8 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 				var child_coord = (parent_coord * 2) + Vector3i(x, y, z)			
 				if context.index.has_chunk(child_coord, parent_level + 1):
 					var child_chunk = context.index.get_chunk(child_coord, parent_level + 1)
-					child_chunk.subdivision_pending = false
-					child_chunk.merge_pending = false
+					context.chunk_state.clear_subdivision_pending(child_chunk)
+					context.chunk_state.clear_merge_pending(child_chunk)
 
 	# Recursively scrub and pool all child nodes
 	_clean_child_geometry(parent_chunk)
@@ -108,8 +98,8 @@ func _clean_child_geometry(parent_chunk: Chunk) -> void:
 		_clean_child_geometry(child)
 
 		child.parent_chunk = null
-		child.subdivision_pending = false
-		child.merge_pending = false
+		context.chunk_state.clear_subdivision_pending(child)
+		context.chunk_state.clear_merge_pending(child)
 
 		context.index.remove_chunk(child.grid_info.chunk_coordinate,child.lod_level)
 		context.chunk_state.unregister_chunk(child)
@@ -128,7 +118,7 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 	if not is_instance_valid(parent_chunk):
 		return
 
-	if not parent_chunk.subdivision_pending:
+	if !context.chunk_state.is_subdivision_pending(parent_chunk):
 		if parent_chunk.current_lod == chunk.lod_level:
 			return 
 			
@@ -151,7 +141,7 @@ func notify_chunk_mesh_ready(chunk: Chunk) -> void:
 				all_siblings_ready = false
 				break
 
-			if sibling.mesh_dirty:
+			if context.chunk_state.is_mesh_dirty(sibling):
 				all_siblings_ready = false
 				break
 
