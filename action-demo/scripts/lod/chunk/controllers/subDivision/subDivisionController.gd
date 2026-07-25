@@ -66,8 +66,7 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 	if context.chunk_state.is_merge_pending(parent_chunk): return
 	context.chunk_state.mark_merge_pending(parent_chunk)
 	# 1. Clear the gate for this parent chunk level
-	parent_chunk.subdivision_pending = false
-	
+	context.chunk_state.clear_subdivision_pending(parent_chunk)
 	# 2. Clear gates for 8 potential child coordinates
 	for x in range(2):
 		for y in range(2):
@@ -84,7 +83,7 @@ func request_merge(parent_coord: Vector3i, parent_level: int) -> void:
 	parent_chunk.current_lod = parent_level
 	parent_chunk.activate()
 	
-	parent_chunk.merge_pending = false
+	context.chunk_state.clear_merge_pending(parent_chunk)
 
 
 func _clean_child_geometry(parent_chunk: Chunk) -> void:

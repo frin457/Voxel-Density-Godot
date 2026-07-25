@@ -64,8 +64,8 @@ func remove_descendants(
 
 		detach_child(parent, child)
 
-		child.subdivision_pending = false
-		child.merge_pending = false
+		context.chunk_state.mark_subdivision_pending(child)
+		context.chunk_state.mark_merge_pending(child)
 
 		context.index.remove_chunk(
 			child.grid_info.chunk_coordinate,

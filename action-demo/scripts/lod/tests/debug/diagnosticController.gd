@@ -24,10 +24,10 @@ func snapshot() -> Dictionary:
 			if !is_instance_valid(chunk):
 				continue
 
-			if chunk.subdivision_pending:
+			if context.chunk_state.is_subdivision_pending(chunk):
 				pending_subdivisions += 1
 
-			if chunk.merge_pending:
+			if context.chunk_state.is_merge_pending(chunk):
 				pending_merges += 1
 
 	return {
